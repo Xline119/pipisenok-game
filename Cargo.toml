@@ -1,0 +1,9 @@
+[package]
+name = "some-bevy-1"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = { version = "0.14.0", features = [ "wav" ] }
+rand = "0.8.5"
+log = "0.4.22"
