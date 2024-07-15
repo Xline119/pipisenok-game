@@ -21,7 +21,7 @@ impl Plugin for EnemyPlugin {
         app
             .init_resource::<EnemySpawnTimer>()
             .add_systems(OnEnter(AppState::Game), spawn_enemies)
-            .add_systems(OnExit(AppState::Game), despawn_enemies)
+            //.add_systems(OnExit(AppState::Game), despawn_enemies)
             .add_systems(
                 Update,
                 (

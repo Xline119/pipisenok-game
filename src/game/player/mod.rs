@@ -13,7 +13,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app
             .add_systems(OnEnter(AppState::Game), spawn_player)
-            .add_systems(OnExit(AppState::Game), despawn_player)
+            //.add_systems(OnExit(AppState::Game), despawn_player)
             .add_systems(
                 Update,
                 (

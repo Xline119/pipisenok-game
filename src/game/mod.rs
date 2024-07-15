@@ -28,7 +28,7 @@ impl Plugin for GamePlugin {
             .init_state::<GameState>()
             .add_event::<GameOver>()
             .add_plugins((PlayerPlugin, EnemyPlugin, StarPlugin))
-            .add_systems(OnEnter(AppState::GameOver), restart_game_on_enter)
+            .add_systems(Update, restart_game_on_enter.run_if(in_state(AppState::GameOver)))
             .add_systems(OnExit(AppState::GameOver), despawn_lose)
             .add_systems(
                 Update,

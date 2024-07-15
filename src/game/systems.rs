@@ -1,6 +1,7 @@
 use bevy::audio::AudioBundle;
 use bevy::input::ButtonInput;
 use bevy::prelude::{AssetServer, Commands, default, Entity, EventReader, info, KeyCode, NextState, PlaybackSettings, Query, Res, ResMut, SpriteBundle, State, Transform, Vec2, Window, With};
+use bevy::utils::info;
 use bevy::window::PrimaryWindow;
 use rand::random;
 use crate::AppState;
@@ -35,69 +36,22 @@ pub fn toggle_pause(
 pub fn restart_game_on_enter(
     mut commands: Commands,
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    window_query: Query<&Window, With<PrimaryWindow>>,
     stars_query: Query<Entity, With<Star>>,
     enemy_query: Query<Entity, With<Enemy>>,
-    asset_server: Res<AssetServer>,
-    mut next_state: ResMut<NextState<GameState>>,
+    mut next_game_state: ResMut<NextState<GameState>>,
+    mut next_app_state: ResMut<NextState<AppState>>,
 ) {
-    let window = window_query.get_single().unwrap();
-
     if keyboard_input.just_pressed(KeyCode::Enter) {
+        next_game_state.set(GameState::Paused);
+        next_app_state.set(AppState::Game);
+        info!("Game restarted");
+
         for stars_entity in stars_query.iter() {
             commands.entity(stars_entity).despawn();
         }
         for enemy_entity in enemy_query.iter() {
             commands.entity(enemy_entity).despawn()
         }
-
-        commands.spawn((
-            SpriteBundle {
-                transform: Transform::from_xyz(
-                    window.width() / 2.0,
-                    window.height() / 2.0,
-                    0.0,
-                ),
-                texture: asset_server.load("sprites/characters/shinobi/Idle-cropped.png"),
-                ..default()
-            },
-            Player {},
-            Score {
-                value: 0
-            }
-        ));
-
-        for _ in 0..NUMBER_OF_ENEMIES {
-            let random_x = random::<f32>() * window.width();
-            let random_y = random::<f32>() * window.height();
-
-            commands.spawn((
-                SpriteBundle {
-                    transform: Transform::from_xyz(random_x, random_y, 0.0),
-                    texture: asset_server.load("sprites/balls/ball_red_large.png"),
-                    ..default()
-                },
-                Enemy {
-                    direction: Vec2::new(random(), random()).normalize(),
-                },
-            ));
-        }
-
-        for _ in 0..NUMBER_OF_STARS {
-            let random_x = random::<f32>() * window.width();
-            let random_y = random::<f32>() * window.height();
-
-            commands.spawn((
-                SpriteBundle {
-                    transform: Transform::from_xyz(random_x, random_y, 0.0),
-                    texture: asset_server.load("sprites/balls/star.png"),
-                    ..default()
-                },
-                Star {},
-            ));
-        }
-
-        next_state.set(GameState::Paused)
     }
 }
 
@@ -114,6 +68,7 @@ pub fn handle_game_over(
     for event in game_over_event.read() {
         next_app_state.set(AppState::GameOver);
         next_game_state.set(GameState::Paused);
+        info!("Game is over");
         info!("Score: {}", event.score);
 
         commands.spawn((
