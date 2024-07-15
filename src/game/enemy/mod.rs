@@ -1,8 +1,10 @@
 use bevy::app::Update;
-use bevy::prelude::{App, IntoSystemConfigs, Plugin, Startup};
+use bevy::prelude::{App, in_state, IntoSystemConfigs, OnEnter, OnExit, Plugin, Startup};
 
 use resources::EnemySpawnTimer;
 use systems::*;
+use crate::AppState;
+use crate::game::GameState;
 
 pub mod components;
 pub mod resources;
@@ -18,7 +20,8 @@ impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
         app
             .init_resource::<EnemySpawnTimer>()
-            .add_systems(Startup, spawn_enemies)
+            .add_systems(OnEnter(AppState::Game), spawn_enemies)
+            .add_systems(OnExit(AppState::Game), despawn_enemies)
             .add_systems(
                 Update,
                 (
@@ -28,6 +31,8 @@ impl Plugin for EnemyPlugin {
                     tick_enemy_spawn_timer,
                     spawn_enemies_over_time
                 )
+                    .run_if(in_state(AppState::Game))
+                    .run_if(in_state(GameState::Running))
             );
     }
 }

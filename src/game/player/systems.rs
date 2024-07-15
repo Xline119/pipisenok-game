@@ -42,6 +42,15 @@ pub fn spawn_player(
     ));
 }
 
+pub fn despawn_player(
+    mut commands: Commands,
+    player_query: Query<Entity, With<Player>>
+) {
+    if let Ok(player_entity) = player_query.get_single() {
+        commands.entity(player_entity).despawn()
+    }
+}
+
 pub fn player_movement(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut player_query: Query<&mut Transform, With<Player>>,
@@ -113,42 +122,21 @@ pub fn enemy_hit_player(
     mut commands: Commands,
     mut player_query: Query<(Entity, &Transform, &Score), With<Player>>,
     enemy_query: Query<&Transform, With<Enemy>>,
-    window_query: Query<&Window, With<PrimaryWindow>>,
-    asset_server: Res<AssetServer>,
     mut game_over_writer: EventWriter<GameOver>
 ) {
-    let window = window_query.get_single().unwrap();
-
     if let Ok((player_entity, player_transform, player_score)) = player_query.get_single_mut() {
         for enemy_transform in enemy_query.iter() {
             let distance = player_transform
                 .translation
                 .distance(enemy_transform.translation);
+
             let player_radius = PLAYER_SIZE / 2.0;
             let enemy_radius = ENEMY_SIZE / 2.0;
 
             if distance < player_radius + enemy_radius {
-                commands.spawn(AudioBundle {
-                    source: asset_server.load("audio/annihilation-gun-sound.wav"),
-                    settings: PlaybackSettings::ONCE,
-                });
-
                 game_over_writer.send(GameOver {
                     score: player_score.value
                 });
-                commands.spawn((
-                    SpriteBundle {
-                        texture: asset_server.load("images/menu/you_lose.png"),
-                        transform: Transform::from_xyz(
-                            window.width() / 2.0,
-                            window.height() / 2.0,
-                            0.0,
-                        ),
-                        ..default()
-                    },
-                    Lose {}
-                ));
-                info!("Score {}", player_score.value);
                 commands.entity(player_entity).despawn()
             }
         }

@@ -1,7 +1,5 @@
 use bevy::asset::AssetServer;
-use bevy::prelude::{
-    Commands, default, Query, Res, ResMut, SpriteBundle, Time, Transform, Window, With
-};
+use bevy::prelude::{Commands, default, Entity, Query, Res, ResMut, SpriteBundle, Time, Transform, Window, With};
 use bevy::window::PrimaryWindow;
 use rand::random;
 
@@ -28,6 +26,15 @@ pub fn spawn_stars(
             },
             Star {},
         ));
+    }
+}
+
+pub fn despawn_stars(
+    mut commands: Commands,
+    star_query: Query<Entity, With<Star>>
+) {
+    for star_entity in star_query.iter() {
+        commands.entity(star_entity).despawn();
     }
 }
 
