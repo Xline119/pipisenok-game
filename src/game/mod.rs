@@ -1,8 +1,9 @@
-use bevy::prelude::{App, AppExtStates, in_state, IntoSystemConfigs, OnEnter, OnExit, Plugin, States, Update};
+use bevy::prelude::{App, AppExtStates, in_state, IntoSystemConfigs, OnExit, Plugin, States, Update};
 
 use enemy::EnemyPlugin;
 use player::PlayerPlugin;
 use star::StarPlugin;
+
 use crate::AppState;
 use crate::events::GameOver;
 use crate::game::systems::{despawn_lose, handle_game_over, restart_game_on_enter, toggle_pause};
@@ -12,6 +13,7 @@ pub mod player;
 pub mod score;
 pub mod star;
 mod systems;
+pub mod location;
 
 pub struct GamePlugin;
 

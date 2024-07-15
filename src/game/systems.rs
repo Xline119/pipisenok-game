@@ -86,7 +86,7 @@ pub fn handle_game_over(
 
         commands.spawn(AudioBundle {
             source: asset_server.load("audio/annihilation-gun-sound.wav"),
-            settings: PlaybackSettings::ONCE,
+            settings: PlaybackSettings::DESPAWN,
         });
     }
 }

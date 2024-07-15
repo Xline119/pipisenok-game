@@ -8,14 +8,11 @@ use bevy::prelude::{
     Commands, default, Entity, EventWriter, KeyCode, Query, Res, SpriteBundle, Time, Transform, Window, With
 };
 use bevy::window::PrimaryWindow;
-use log::info;
 
+use crate::events::GameOver;
 use crate::game::enemy::components::Enemy;
 use crate::game::enemy::ENEMY_SIZE;
-use crate::events::GameOver;
-use crate::game::player::components::{
-    Lose, Player
-};
+use crate::game::player::components::Player;
 use crate::game::score::components::Score;
 use crate::game::star::components::Star;
 use crate::game::star::STAR_SIZE;
@@ -31,7 +28,8 @@ pub fn spawn_player(
     let window = window_query.get_single().unwrap();
     commands.spawn((
         SpriteBundle {
-            transform: Transform::from_xyz(window.width() / 2.0, window.height() / 2.0, 0.0),
+            transform: Transform::from_xyz(window.width() / 2.0, window.height() / 2.0, 1.0)
+                .with_scale(Vec3::new(1.6, 1.7, 0.0)),
             texture: asset_server.load("sprites/characters/shinobi/Idle-cropped.png"),
             ..default()
         },
@@ -161,7 +159,7 @@ pub fn player_collect_star(
                 player_score.value += 1;
                 commands.spawn(AudioBundle {
                     source: asset_server.load("audio/coin_pick.wav"),
-                    settings: PlaybackSettings::ONCE,
+                    settings: PlaybackSettings::DESPAWN,
                 });
 
                 commands.entity(star_entity).despawn()

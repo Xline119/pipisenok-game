@@ -21,7 +21,7 @@ impl Plugin for StarPlugin {
         app
             .init_resource::<StarSpawnTimer>()
             .add_systems(OnEnter(AppState::Game), spawn_stars)
-            //.add_systems(OnExit(AppState::Game), despawn_stars)
+            .add_systems(OnEnter(AppState::MainMenu), despawn_stars)
             .add_systems(
                 Update,
                 (
