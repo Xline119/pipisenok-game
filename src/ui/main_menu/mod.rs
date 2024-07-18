@@ -1,11 +1,12 @@
+use bevy::prelude::{App, in_state, IntoSystemConfigs, OnEnter, OnExit, Plugin, Update};
+
+use crate::AppState;
+use systems::interactions::interact_with_play_button;
+use systems::layout::{despwan_main_menu, spawn_main_menu};
+
 mod systems;
 pub mod components;
 mod styles;
-
-use bevy::prelude::{App, in_state, IntoSystemConfigs, OnEnter, OnExit, Plugin, Update};
-use crate::AppState;
-use crate::main_menu::systems::interactions::interact_with_play_button;
-use crate::main_menu::systems::layout::{despwan_main_menu, spawn_main_menu};
 
 pub struct MainMenuPlugin;
 

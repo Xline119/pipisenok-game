@@ -1,7 +1,7 @@
 use bevy::prelude::{AssetServer, BackgroundColor, BuildChildren, ButtonBundle, Color, Commands, default, DespawnRecursiveExt, Entity, ImageBundle, Query, Res, Text, TextBundle, TextSection, UiImage, With};
 
-use crate::main_menu::components::{MainMenu, PlayButton};
-use crate::main_menu::styles::{get_button_style, get_button_text_style, get_main_menu_image_style, get_main_menu_style, NORMAL_BUTTON_COLOR};
+use crate::ui::main_menu::components::{MainMenu, PlayButton};
+use crate::ui::main_menu::styles::{get_button_style, get_button_text_style, get_main_menu_style};
 
 pub fn spawn_main_menu(
     mut commands: Commands,

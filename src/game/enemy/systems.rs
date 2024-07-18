@@ -75,20 +75,6 @@ pub fn update_enemy_direction(
             enemy.direction.y *= -1.0;
             direction_changed = true;
         }
-
-        if direction_changed {
-            if random::<f32>() > 0.5 {
-                commands.spawn(AudioBundle {
-                    source: asset_server.load("audio/pluck_001.ogg"),
-                    settings: PlaybackSettings::ONCE,
-                });
-            } else {
-                commands.spawn(AudioBundle {
-                    source: asset_server.load("audio/pluck_002.ogg"),
-                    settings: PlaybackSettings::ONCE,
-                });
-            }
-        }
     }
 }
 

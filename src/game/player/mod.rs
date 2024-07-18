@@ -1,5 +1,6 @@
 use bevy::app::Update;
-use bevy::prelude::{App, in_state, IntoSystemConfigs, OnEnter, OnExit, Plugin, Startup};
+use bevy::prelude::{App, in_state, IntoSystemConfigs, OnEnter, Plugin};
+
 use crate::AppState;
 use crate::game::GameState;
 use crate::game::player::systems::*;
@@ -19,11 +20,13 @@ impl Plugin for PlayerPlugin {
                 (
                     player_movement,
                     bound_player_movement,
+                    stick_camera_to_player,
                     enemy_hit_player,
                     player_collect_star
                 )
                     .run_if(in_state(AppState::Game))
                     .run_if(in_state(GameState::Running))
-            );
+            )
+            .add_systems(Update, animate_sprite.run_if(in_state(AppState::Game)));
     }
 }

@@ -1,8 +1,8 @@
 use bevy::asset::AssetServer;
 use bevy::prelude::{Commands, default, Entity, Query, Res, SpriteBundle, Transform, Vec3, With};
-use bevy::window::{PrimaryWindow, Window};
-use crate::game::location::components::AutumnForestLocation;
+
 use crate::{WINDOW_HEIGHT, WINDOW_WIDTH};
+use crate::game::location::components::AutumnForestLocation;
 
 pub fn spawn_forest_location(
     mut commands: Commands,

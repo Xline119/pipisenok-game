@@ -4,40 +4,85 @@ use bevy::audio::{
 };
 use bevy::input::ButtonInput;
 use bevy::math::Vec3;
-use bevy::prelude::{
-    Commands, default, Entity, EventWriter, KeyCode, Query, Res, SpriteBundle, Time, Transform, Window, With
-};
+use bevy::prelude::{Assets, Camera, Commands, Component, default, Deref, DerefMut, Entity, EventWriter, KeyCode, Mut, Query, Res, ResMut, SpriteBundle, TextureAtlasLayout, Time, Timer, TimerMode, Transform, UVec2, Window, With, Without};
+use bevy::sprite::TextureAtlas;
 use bevy::window::PrimaryWindow;
 
 use crate::events::GameOver;
 use crate::game::enemy::components::Enemy;
 use crate::game::enemy::ENEMY_SIZE;
+use crate::game::movement::components::{Acceleration, Direction, MoveableObjectBundle, Velocity};
 use crate::game::player::components::Player;
 use crate::game::score::components::Score;
 use crate::game::star::components::Star;
 use crate::game::star::STAR_SIZE;
+use crate::WINDOW_WIDTH;
 
-const PLAYER_SPEED: f32 = 500.0;
+const STARTING_TRANSLATION: Vec3 = Vec3::new(WINDOW_WIDTH / 2.0, WINDOW_WIDTH / 2.0, 1.0);
+const PLAYER_SPEED: f32 = 200.0;
 const PLAYER_SIZE: f32 = 64.0;
+
 
 pub fn spawn_player(
     mut commands: Commands,
-    window_query: Query<&Window, With<PrimaryWindow>>,
     asset_server: Res<AssetServer>,
+    mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>
 ) {
-    let window = window_query.get_single().unwrap();
     commands.spawn((
-        SpriteBundle {
-            transform: Transform::from_xyz(window.width() / 2.0, window.height() / 2.0, 1.0)
-                .with_scale(Vec3::new(1.6, 1.7, 0.0)),
-            texture: asset_server.load("sprites/characters/shinobi/Idle-cropped.png"),
-            ..default()
+        MoveableObjectBundle {
+            velocity: Velocity { value: 0.0 },
+            acceleration: Acceleration { value: 0.0 },
+            direction: Vec3::ZERO.into(),
+            model: SpriteBundle {
+                transform: Transform::from_xyz(WINDOW_WIDTH / 2.0, WINDOW_WIDTH / 2.0, 1.0)
+                    .with_scale(Vec3::new(1.6, 1.7, 0.0)),
+                texture: asset_server.load("sprites/characters/shinobi/Idle.png"),
+                ..default()
+            }
         },
-        Player {},
-        Score {
-            value: 0
-        }
+        TextureAtlas {
+            layout: texture_atlas_layouts.add(TextureAtlasLayout::from_grid(UVec2::splat(128), 6, 1, None, None)),
+            index: 1,
+        },
+        AnimationIndices { first: 1, last: 5 },
+        AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
+        Player {}
     ));
+}
+
+pub fn stick_camera_to_player(
+    mut camera_query: Query<&mut Transform, With<Camera>>,
+    player_query: Query<&Transform, (With<Player>, Without<Camera>)>
+) {
+    let mut camera_transform = camera_query.single_mut();
+    let player_transform = player_query.single();
+
+    camera_transform.translation = player_transform.translation
+}
+
+#[derive(Component)]
+pub struct AnimationIndices {
+    first: usize,
+    last: usize,
+}
+
+#[derive(Component, Deref, DerefMut)]
+pub struct AnimationTimer(Timer);
+
+pub fn animate_sprite(
+    time: Res<Time>,
+    mut query: Query<(&AnimationIndices, &mut AnimationTimer, &mut TextureAtlas)>,
+) {
+    for (indices, mut timer, mut atlas) in &mut query {
+        timer.tick(time.delta());
+        if timer.just_finished() {
+            atlas.index = if atlas.index == indices.last {
+                indices.first
+            } else {
+                atlas.index + 1
+            };
+        }
+    }
 }
 
 pub fn despawn_player(
@@ -51,38 +96,38 @@ pub fn despawn_player(
 
 pub fn player_movement(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut player_query: Query<&mut Transform, With<Player>>,
-    time: Res<Time>,
+    mut player_query: Query<(&mut Velocity, &mut Direction, &mut Acceleration), With<Player>>,
 ) {
-    if let Ok(mut transform) = player_query.get_single_mut() {
-        let mut direction = Vec3::ZERO;
-        let mut speed = PLAYER_SPEED;
+    let (mut velocity, mut direction, mut acceleration) = player_query.single_mut();
+    direction.value = Vec3::ZERO;
 
+    if keyboard_input.pressed(KeyCode::KeyA) || keyboard_input.pressed(KeyCode::ArrowLeft) {
+        direction.value += Vec3::new(-1.0, 0.0, 0.0);
+        acceleration.value = 1.0;
+    }
+
+    if keyboard_input.pressed(KeyCode::KeyD) || keyboard_input.pressed(KeyCode::ArrowRight) {
+        direction.value += Vec3::new(1.0, 0.0, 0.0);
+        acceleration.value = 1.0;
+    }
+
+    if keyboard_input.pressed(KeyCode::KeyW) || keyboard_input.pressed(KeyCode::ArrowUp) {
+        direction.value += Vec3::new(0.0, 1.0, 0.0);
+        acceleration.value = 1.0;
+    }
+
+    if keyboard_input.pressed(KeyCode::KeyS) || keyboard_input.pressed(KeyCode::ArrowDown) {
+        direction.value += Vec3::new(0.0, -1.0, 0.0);
+        acceleration.value = 1.0;
+    }
+
+    if direction.value.length() > 0.0 {
         if keyboard_input.pressed(KeyCode::ShiftLeft) {
-            speed *= 1.5;
+            acceleration.value *= 2.0;
         }
 
-        if keyboard_input.pressed(KeyCode::KeyA) || keyboard_input.pressed(KeyCode::ArrowLeft) {
-            direction += Vec3::new(-1.0, 0.0, 0.0);
-        }
-
-        if keyboard_input.pressed(KeyCode::KeyD) || keyboard_input.pressed(KeyCode::ArrowRight) {
-            direction += Vec3::new(1.0, 0.0, 0.0);
-        }
-
-        if keyboard_input.pressed(KeyCode::KeyW) || keyboard_input.pressed(KeyCode::ArrowUp) {
-            direction += Vec3::new(0.0, 1.0, 0.0);
-        }
-
-        if keyboard_input.pressed(KeyCode::KeyS) || keyboard_input.pressed(KeyCode::ArrowDown) {
-            direction += Vec3::new(0.0, -1.0, 0.0);
-        }
-
-        if direction.length() > 0.0 {
-            direction = direction.normalize()
-        }
-
-        transform.translation += direction * speed * time.delta_seconds()
+        direction.value = direction.value.normalize();
+        velocity.value = PLAYER_SPEED;
     }
 }
 

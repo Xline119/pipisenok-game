@@ -2,8 +2,8 @@ use bevy::color::Color;
 use bevy::prelude::{BackgroundColor, Changed, Interaction, NextState, Query, ResMut, With};
 
 use crate::AppState;
-use crate::main_menu::components::PlayButton;
-use crate::main_menu::styles::{HOVERED_BUTTON_COLOR, PRESSED_BUTTON_COLOR};
+use crate::ui::main_menu::components::PlayButton;
+use crate::ui::main_menu::styles::{HOVERED_BUTTON_COLOR, PRESSED_BUTTON_COLOR};
 
 pub fn interact_with_play_button(
     mut button_query: Query<
