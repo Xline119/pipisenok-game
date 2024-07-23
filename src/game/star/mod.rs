@@ -1,9 +1,11 @@
 use bevy::app::{
-    App, Plugin, Startup, Update
+    App, Plugin, Update
 };
-use bevy::prelude::{in_state, IntoSystemConfigs, OnEnter, OnExit};
+use bevy::prelude::{in_state, IntoSystemConfigs, OnEnter};
+
 use resources::StarSpawnTimer;
 use systems::*;
+
 use crate::AppState;
 use crate::game::GameState;
 

@@ -1,6 +1,6 @@
-use bevy::app::Update;
-use bevy::prelude::{App, in_state, IntoSystemConfigs, OnEnter, Plugin};
+use bevy::prelude::*;
 
+use crate::animation::animation::{animate, setup_animations};
 use crate::AppState;
 use crate::game::GameState;
 use crate::game::player::systems::*;
@@ -13,7 +13,9 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_systems(OnEnter(AppState::Game), spawn_player)
+            //.add_plugins(MineAnimationPlugin)
+            //TODO: move setup_animations to animation plugin
+            .add_systems(OnEnter(AppState::Game), (spawn_player, setup_animations).chain())
             .add_systems(OnEnter(AppState::MainMenu), despawn_player)
             .add_systems(
                 Update,
@@ -21,12 +23,12 @@ impl Plugin for PlayerPlugin {
                     player_movement,
                     bound_player_movement,
                     stick_camera_to_player,
-                    enemy_hit_player,
-                    player_collect_star
+                    player_collect_star,
+                    //TODO: move animate to animation plugin
+                    animate
                 )
                     .run_if(in_state(AppState::Game))
                     .run_if(in_state(GameState::Running))
-            )
-            .add_systems(Update, animate_sprite.run_if(in_state(AppState::Game)));
+            );
     }
 }

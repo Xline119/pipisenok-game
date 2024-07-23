@@ -1,14 +1,12 @@
-use bevy::asset::AssetServer;
-use bevy::audio::{AudioBundle, PlaybackSettings};
-use bevy::math::{Vec2, Vec3};
-use bevy::prelude::{Commands, default, Entity, Query, Res, ResMut, SpriteBundle, Time, Transform, Window, With};
+use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use rand::random;
 
-use crate::game::enemy::components::Enemy;
+use crate::{WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::game::enemy::{
     ENEMY_SIZE, ENEMY_SPEED, NUMBER_OF_ENEMIES
 };
+use crate::game::enemy::components::Enemy;
 use crate::game::enemy::resources::EnemySpawnTimer;
 
 pub fn spawn_enemies(
@@ -54,8 +52,6 @@ pub fn enemy_movement(mut enemy_query: Query<(&mut Transform, &Enemy)>, time: Re
 pub fn update_enemy_direction(
     mut enemy_query: Query<(&Transform, &mut Enemy)>,
     window_query: Query<&Window, With<PrimaryWindow>>,
-    asset_server: Res<AssetServer>,
-    mut commands: Commands,
 ) {
     let window = window_query.get_single().unwrap();
 
@@ -118,14 +114,11 @@ pub fn tick_enemy_spawn_timer(
 pub fn spawn_enemies_over_time(
     mut commands: Commands,
     enemy_spawn_timer: Res<EnemySpawnTimer>,
-    window_query: Query<&Window, With<PrimaryWindow>>,
     asset_server: Res<AssetServer>
 ) {
-    let window = window_query.get_single().unwrap();
-
     if enemy_spawn_timer.timer.finished() {
-        let random_x = random::<f32>() * window.width();
-        let random_y = random::<f32>() * window.height();
+        let random_x = random::<f32>() * WINDOW_WIDTH;
+        let random_y = random::<f32>() * WINDOW_HEIGHT;
 
         commands.spawn((
             SpriteBundle {

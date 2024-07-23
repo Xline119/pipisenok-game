@@ -1,18 +1,11 @@
-use bevy::audio::AudioBundle;
-use bevy::input::ButtonInput;
-use bevy::prelude::{AssetServer, Commands, default, Entity, EventReader, info, KeyCode, NextState, PlaybackSettings, Query, Res, ResMut, SpriteBundle, State, Transform, Vec2, Window, With};
-use bevy::utils::info;
-use bevy::window::PrimaryWindow;
-use rand::random;
-use crate::AppState;
+use bevy::prelude::*;
+
+use crate::{AppState, WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::events::GameOver;
 use crate::game::enemy::components::Enemy;
-use crate::game::enemy::NUMBER_OF_ENEMIES;
 use crate::game::GameState;
-use crate::game::player::components::{Lose, Player};
-use crate::game::score::components::Score;
+use crate::game::player::components::{Lose};
 use crate::game::star::components::Star;
-use crate::game::star::NUMBER_OF_STARS;
 
 pub fn toggle_pause(
     keyboard_input: Res<ButtonInput<KeyCode>>,
@@ -61,10 +54,7 @@ pub fn handle_game_over(
     mut next_game_state: ResMut<NextState<GameState>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    window_query: Query<&Window, With<PrimaryWindow>>
 ) {
-    let window = window_query.get_single().unwrap();
-
     for event in game_over_event.read() {
         next_app_state.set(AppState::GameOver);
         next_game_state.set(GameState::Paused);
@@ -75,8 +65,8 @@ pub fn handle_game_over(
             SpriteBundle {
                 texture: asset_server.load("images/menu/you_lose.png"),
                 transform: Transform::from_xyz(
-                    window.width() / 2.0,
-                    window.height() / 2.0,
+                    WINDOW_WIDTH / 2.0,
+                    WINDOW_HEIGHT / 2.0,
                     0.0,
                 ),
                 ..default()
@@ -98,4 +88,11 @@ pub fn despawn_lose(
     if let Ok(lose_entity) = lose_query.get_single_mut() {
         commands.entity(lose_entity).despawn();
     }
+}
+
+pub fn spawn_camera(mut commands: Commands) {
+    commands.spawn(Camera2dBundle {
+        transform: Transform::from_xyz(WINDOW_WIDTH / 2.0, WINDOW_WIDTH / 2.0, 1.0),
+        ..default()
+    });
 }

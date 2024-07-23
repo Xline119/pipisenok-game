@@ -1,30 +1,7 @@
-use bevy::app::AppExit;
-use bevy::audio::{
-    AudioBundle, PlaybackSettings
-};
-use bevy::input::ButtonInput;
-use bevy::prelude::{AssetServer, Camera2dBundle, Commands, Entity, Events, info, KeyCode, NextState, Query, Res, ResMut, SpriteBundle, State, Transform, Vec2, With};
-use bevy::utils::default;
-use bevy::window::{
-    PrimaryWindow, Window
-};
-use rand::random;
-use crate::AppState;
-use crate::game::enemy::components::Enemy;
-use crate::game::enemy::NUMBER_OF_ENEMIES;
-use crate::game::GameState;
-use crate::game::player::components::{Lose, Player};
-use crate::game::score::components::Score;
-use crate::game::star::components::Star;
-use crate::game::star::NUMBER_OF_STARS;
+use bevy::prelude::*;
 
-pub fn spawn_camera(mut commands: Commands, window_query: Query<&Window, With<PrimaryWindow>>) {
-    let window = window_query.get_single().unwrap();
-    commands.spawn(Camera2dBundle {
-        transform: Transform::from_xyz(window.width() / 2.0, window.height() / 2.0, 0.0),
-        ..default()
-    });
-}
+use crate::{AppState};
+use crate::game::GameState;
 
 pub fn exit_on_escape(
     keyboard_input: Res<ButtonInput<KeyCode>>,

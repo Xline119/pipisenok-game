@@ -1,8 +1,8 @@
-use bevy::app::App;
-use bevy::prelude::{in_state, IntoSystemConfigs, Plugin, Update};
+use bevy::prelude::*;
+
 use crate::AppState;
 use crate::game::GameState;
-use crate::game::movement::systems::{update_position};
+use crate::game::movement::systems::update_position;
 
 pub mod components;
 mod systems;

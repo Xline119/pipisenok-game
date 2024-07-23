@@ -1,7 +1,7 @@
 use bevy::prelude::Component;
 
 #[derive(Component)]
-pub struct Player {}
+pub struct Player;
 
 #[derive(Component)]
-pub struct Lose {}
+pub struct Lose;
