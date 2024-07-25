@@ -1,5 +1,20 @@
 use bevy::prelude::*;
 
+pub struct PepaAnimationPlugin;
+
+impl Plugin for PepaAnimationPlugin {
+    fn build(&self, app: &mut App) {
+        app
+            .add_systems(
+                Startup,
+                (
+                    setup_animations
+                )
+            )
+            .add_systems(Update, (animate));
+    }
+}
+
 #[derive(Bundle)]
 pub struct Animation {
     pub sheet_props: SheetProps,
@@ -43,11 +58,11 @@ pub fn setup_animations(
     mut query: Query<(Entity, &SheetProps, &AnimationIndices)>,
     mut commands: Commands,
 ) {
-    for (entity, animation_texture, animation_indices) in query.iter() {
+    for (entity, sheet_props, animation_indices) in query.iter() {
         let layout = TextureAtlasLayout::from_grid(
-            animation_texture.cell_size,
-            animation_texture.cols,
-            animation_texture.rows,
+            sheet_props.cell_size,
+            sheet_props.cols,
+            sheet_props.rows,
             None,
             None,
         );
@@ -65,7 +80,6 @@ pub fn animate(
 ) {
     for (mut timer, indices, mut texture_atlas) in query.iter_mut() {
         timer.0.tick(time.delta());
-        info!("Indices first: {} last: {}", indices.first, indices.last);
 
         if timer.0.finished() {
             set_indexes(texture_atlas, indices.last, indices.first);

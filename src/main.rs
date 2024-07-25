@@ -10,7 +10,8 @@ pub mod events;
 mod systems;
 mod game;
 mod ui;
-mod animation;
+pub mod logo;
+pub mod animation;
 
 const WINDOW_WIDTH: f32 = 1280.0;
 const WINDOW_HEIGHT: f32 = 720.0;
@@ -34,14 +35,18 @@ fn main() {
                 )
                 .set(ImagePlugin::default_nearest())
         )
+        .add_plugins((UiPlugin, GamePlugin, LocationPlugin,
+                      //LogoPlugin
+                      )
+        )
         .init_state::<AppState>()
-        .add_plugins((UiPlugin, GamePlugin, LocationPlugin))
         .add_systems(
             Update,
             (
                 exit_on_escape,
                 transition_to_game_state,
-                transition_to_main_menu_state
+                transition_to_main_menu_state,
+                //animate
             ),
         )
         .run();
@@ -50,6 +55,8 @@ fn main() {
 #[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum AppState {
     #[default]
+    Logo,
+    Loading,
     MainMenu,
     Game,
     GameOver,
