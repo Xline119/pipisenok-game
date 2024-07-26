@@ -1,4 +1,7 @@
-use bevy::prelude::{AlignItems, AssetServer, Color, FlexDirection, JustifyContent, Res, Style, TextStyle, UiRect, Val};
+use bevy::prelude::{
+    AlignItems, AssetServer, Color, FlexDirection, JustifyContent, Res, Style, TextStyle, UiRect,
+    Val,
+};
 
 pub const NORMAL_BUTTON_COLOR: Color = Color::srgb(0.15, 0.15, 0.15);
 pub const HOVERED_BUTTON_COLOR: Color = Color::srgb(0.25, 0.25, 0.25);

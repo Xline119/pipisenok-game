@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
-use crate::{AppState, WINDOW_WIDTH};
 use crate::animation::animation::{Animation, AnimationIndices, AnimationTimer, SheetProps};
+use crate::{AppState, WINDOW_WIDTH};
 
 const LOGO_WIDTH: f32 = 566.0;
 const LOGO_HEIGHT: f32 = 68.0;
@@ -12,8 +12,7 @@ pub struct LogoPlugin;
 
 impl Plugin for LogoPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .init_resource::<LogoTimer>()
+        app.init_resource::<LogoTimer>()
             .add_systems(Startup, show_logo.run_if(in_state(AppState::Logo)))
             .add_systems(Update, handle_logo_end.run_if(in_state(AppState::Logo)));
     }
@@ -31,10 +30,7 @@ impl Default for LogoTimer {
     }
 }
 
-pub fn show_logo(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-) {
+pub fn show_logo(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
         SpriteBundle {
             transform: Transform::from_xyz(WINDOW_WIDTH / 2.0, WINDOW_WIDTH / 2.0, 1.0),
@@ -49,16 +45,13 @@ pub fn show_logo(
             sheet_props: SheetProps {
                 cell_size: UVec2::new((LOGO_WIDTH / 8.0) as u32, LOGO_HEIGHT as u32),
                 rows: 1,
-                cols: 8
+                cols: 8,
             },
             //animation_direction: AnimationDirection::Still,
-            animation_indices: AnimationIndices {
-                first: 0,
-                last: 7
-            },
-            animation_timer: AnimationTimer(Timer::from_seconds(0.625, TimerMode::Once))
+            animation_indices: AnimationIndices { first: 0, last: 7 },
+            animation_timer: AnimationTimer(Timer::from_seconds(0.625, TimerMode::Once)),
         },
-        Logo {}
+        Logo {},
     ));
 }
 
@@ -67,7 +60,7 @@ pub fn handle_logo_end(
     mut commands: Commands,
     query: Query<Entity, With<Logo>>,
     mut next_state: ResMut<NextState<AppState>>,
-    time: Res<Time>
+    time: Res<Time>,
 ) {
     logo_timer.0.tick(time.delta());
     if logo_timer.0.finished() {

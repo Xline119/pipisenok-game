@@ -4,13 +4,7 @@ pub struct PepaAnimationPlugin;
 
 impl Plugin for PepaAnimationPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_systems(
-                Startup,
-                (
-                    setup_animations
-                )
-            )
+        app.add_systems(Startup, (setup_animations))
             .add_systems(Update, (animate));
     }
 }

@@ -1,17 +1,16 @@
 use bevy::prelude::*;
 use bevy::window::WindowResolution;
 
-use crate::game::GamePlugin;
-use crate::game::location::LocationPlugin;
+use crate::game::game::GamePlugin;
+use crate::game::location::location::LocationPlugin;
 use crate::systems::*;
 use crate::ui::UiPlugin;
 
-pub mod events;
-mod systems;
-mod game;
-mod ui;
-pub mod logo;
 pub mod animation;
+pub mod game;
+pub mod logo;
+pub mod systems;
+pub mod ui;
 
 const WINDOW_WIDTH: f32 = 1280.0;
 const WINDOW_HEIGHT: f32 = 720.0;
@@ -20,25 +19,15 @@ fn main() {
     App::new()
         .add_plugins(
             DefaultPlugins
-                .set(
-                    WindowPlugin {
-                        primary_window: Some(
-                            Window {
-                                resolution: WindowResolution::new(WINDOW_WIDTH, WINDOW_HEIGHT),
-                                title: "Last of Pipisenok".to_string(),
-                                resizable: false,
-                                ..Default::default()
-                            }
-                        ),
-                        ..Default::default()
-                    }
-                )
-                .set(ImagePlugin::default_nearest())
+                .set(get_window_settings())
+                .set(ImagePlugin::default_nearest()),
         )
-        .add_plugins((UiPlugin, GamePlugin, LocationPlugin,
-                      //LogoPlugin
-                      )
-        )
+        .add_plugins((
+            UiPlugin,
+            GamePlugin,
+            LocationPlugin,
+            //LogoPlugin
+        ))
         .init_state::<AppState>()
         .add_systems(
             Update,
@@ -46,7 +35,6 @@ fn main() {
                 exit_on_escape,
                 transition_to_game_state,
                 transition_to_main_menu_state,
-                //animate
             ),
         )
         .run();
@@ -60,4 +48,16 @@ pub enum AppState {
     MainMenu,
     Game,
     GameOver,
+}
+
+fn get_window_settings() -> WindowPlugin {
+    WindowPlugin {
+        primary_window: Some(Window {
+            resolution: WindowResolution::new(WINDOW_WIDTH, WINDOW_HEIGHT),
+            title: "Last of Pipisenok".to_string(),
+            resizable: false,
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
 }

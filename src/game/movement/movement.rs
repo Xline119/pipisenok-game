@@ -1,8 +1,7 @@
-use bevy::ecs::observer::TriggerTargets;
 use bevy::prelude::*;
 
 use crate::AppState;
-use crate::game::GameState;
+use crate::game::game::GameState;
 
 pub struct MovementPlugin;
 
@@ -14,7 +13,7 @@ impl Plugin for MovementPlugin {
                 Update,
                 (update_position)
                     .run_if(in_state(AppState::Game))
-                    .run_if(in_state(GameState::Running))
+                    .run_if(in_state(GameState::Running)),
             );
     }
 }
@@ -31,7 +30,14 @@ pub struct Move {
     pub entity: Entity,
     pub direction: Direction,
     pub acceleration: f32,
-    pub speed: f32
+    pub speed: f32,
+}
+
+#[derive(Event, Debug)]
+pub struct Run {
+    pub entity: Entity,
+    pub acceleration: f32,
+    pub speed: f32,
 }
 
 #[derive(Default, Copy, Clone, Debug, Eq, Hash)]
@@ -45,7 +51,7 @@ pub enum Direction {
     UpRight,
     UpLeft,
     DownRight,
-    DownLeft
+    DownLeft,
 }
 
 impl PartialEq for Direction {
@@ -65,52 +71,49 @@ impl PartialEq for Direction {
     }
 }
 
-impl Move {
+impl Direction {
+    pub const DIRECTIONS: [Self; 8] = [
+        Direction::Up,
+        Direction::Down,
+        Direction::Left,
+        Direction::Right,
+        Direction::UpRight,
+        Direction::UpLeft,
+        Direction::DownRight,
+        Direction::DownLeft,
+    ];
+
     pub fn get_direction_vec(&self) -> Vec3 {
-        match self.direction {
-            Direction::Up => { Vec3::Y }
-            Direction::Down => { Vec3::NEG_Y }
-            Direction::Right => { Vec3::X }
-            Direction::Left => { Vec3::NEG_X }
-            Direction::UpRight => { Vec3::new(1.0, 1.0, 0.0) }
-            Direction::UpLeft => { Vec3::new(-1.0, 1.0, 0.0) }
-            Direction::DownRight => { Vec3::new(1.0, -1.0, 0.0) }
-            Direction::DownLeft => { Vec3::new(-1.0, -1.0, 0.0) }
-            _ => { Vec3::ZERO }
+        match self {
+            Direction::Up => Vec3::Y,
+            Direction::Down => Vec3::NEG_Y,
+            Direction::Right => Vec3::X,
+            Direction::Left => Vec3::NEG_X,
+            Direction::UpRight => Vec3::new(1.0, 1.0, 0.0),
+            Direction::UpLeft => Vec3::new(-1.0, 1.0, 0.0),
+            Direction::DownRight => Vec3::new(1.0, -1.0, 0.0),
+            Direction::DownLeft => Vec3::new(-1.0, -1.0, 0.0),
+            _ => Vec3::ZERO,
         }
     }
 }
 
-// pub fn update_direction(
-//     mut event_reader: EventReader<Move>,
-//     mut transform_query: Query<(&Movement, &mut Transform)>,
-//     time: Res<Time>,
-// ) {
-//     for mut move_event in event_reader.read() {
-//         let (movement, mut transform) = transform_query.get_mut(move_event.entity).unwrap();
-//         transform.translation += movement.direction * movement.velocity * movement.acceleration * time.delta_seconds();
-//     }
-// }
-
 pub fn update_position(
     mut event_reader: EventReader<Move>,
-    mut transform_query: Query<(&Movement, &mut Transform)>,
+    mut transform_query: Query<(&mut Transform)>,
     time: Res<Time>,
 ) {
-    //info!("Updating position");
     for mut move_event in event_reader.read() {
-        let (movement, mut transform) = transform_query.get_mut(move_event.entity).unwrap();
+        let (mut transform) = transform_query.get_mut(move_event.entity).unwrap();
 
-        info!("Init transform: {}, of: {}", move_event.entity, transform.translation);
-        let mut direction = move_event.get_direction_vec();
+        info!("Init transform: {}, of: {}",move_event.entity, transform.translation);
+        let mut direction = move_event.direction.get_direction_vec();
 
         if direction.length() > 0.0 {
             direction = direction.normalize()
         }
 
-        info!("Direction: {:?}", direction);
-
-        transform.translation += direction * move_event.speed * move_event.acceleration * time.delta_seconds();
+        transform.translation += direction * move_event.speed * time.delta_seconds();
         info!("New transform: {}", transform.translation)
     }
 }

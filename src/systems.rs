@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
-use crate::{AppState};
-use crate::game::GameState;
+use crate::AppState;
+use crate::game::game::GameState;
 
 pub fn exit_on_escape(
     keyboard_input: Res<ButtonInput<KeyCode>>,
@@ -22,7 +22,7 @@ pub fn play_background_sound(mut commands: Commands, asset_server: Res<AssetServ
 pub fn transition_to_game_state(
     app_state: Res<State<AppState>>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut next_state: ResMut<NextState<AppState>>
+    mut next_state: ResMut<NextState<AppState>>,
 ) {
     if keyboard_input.just_pressed(KeyCode::KeyG) {
         if *app_state.get() != AppState::Game {
