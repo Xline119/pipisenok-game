@@ -18,9 +18,7 @@ use bevy::utils::HashMap;
 use crate::{
     AppState, WINDOW_HEIGHT, WINDOW_WIDTH
 };
-use crate::animation::animation::{
-    animate, Animation, AnimationIndices, AnimationTimer, setup_animations, SheetProps
-};
+use crate::animation::animation::{animate, Animation, Animate, AnimationIndices, AnimationTimer, setup_animations, SheetProps, PepaAnimationPlugin};
 use crate::game::controls::controls::{ControlledAction, Controls};
 use crate::game::game::GameState;
 use crate::game::movement::movement::{Direction, Move, Movement};
@@ -38,6 +36,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app
             //TODO: move setup_animations to animation plugin
+            .add_event::<Animate>()
             .add_systems(
                 OnEnter(AppState::Game),
                 (
@@ -74,7 +73,7 @@ pub fn spawn_player(mut commands: Commands, asset_server: Res<AssetServer>) {
             direction: Vec3::ZERO,
         },
         SpriteBundle {
-            transform: Transform::from_xyz(WINDOW_WIDTH / 2.0, WINDOW_WIDTH / 2.0, 1.0)
+            transform: Transform::from_xyz(WINDOW_WIDTH / 2.0, WINDOW_HEIGHT / 2.0, 1.0)
                 .with_scale(Vec3::new(1.7, 1.7, 0.0)),
             texture: asset_server.load("sprites/characters/shinobi/animations-full-002.png"),
             ..default()
@@ -85,7 +84,6 @@ pub fn spawn_player(mut commands: Commands, asset_server: Res<AssetServer>) {
                 rows: 3,
                 cols: 8,
             },
-            //animation_direction: AnimationDirection::Still,
             animation_indices: AnimationIndices {
                 first: 16,
                 last: 23,
@@ -112,17 +110,37 @@ pub fn spawn_player(mut commands: Commands, asset_server: Res<AssetServer>) {
 }
 
 pub fn player_movement(
-    mut sprite_query: Query<&mut Sprite, With<Player>>,
-    mut query: Query<(Entity, &mut AnimationIndices, &Controls), With<Player>>,
-    mut event_writer: EventWriter<Move>,
+    mut query: Query<(Entity, &Controls), With<Player>>,
+    mut move_event_writer: EventWriter<Move>,
+    mut animate_event_writer: EventWriter<Animate>,
 ) {
-    let (player_entity, mut animation_indices, player_controls) = query.single_mut();
-    let mut sprite = sprite_query.single_mut();
+    let (player_entity, player_controls) = query.single_mut();
 
-    //TODO: move to animation
-    sprite.flip_x = false;
-    animation_indices.first = 16;
-    animation_indices.last = 23;
+    if player_controls.state.is_move_action() {
+        let mut animate_event = Animate {
+            entity: player_entity,
+            direction: player_controls.state.get_direction(),
+            animation_indices: AnimationIndices {
+                first: 8,
+                last: 15
+            }
+        };
+
+        info!("Sending animate event: {:?}", &animate_event);
+        animate_event_writer.send(animate_event);
+    } else {
+        let mut animate_event = Animate {
+            entity: player_entity,
+            direction: player_controls.state.get_direction(),
+            animation_indices: AnimationIndices {
+                first: 16,
+                last: 23
+            }
+        };
+
+        info!("Sending animate event: {:?}", &animate_event);
+        animate_event_writer.send(animate_event);
+    }
 
     if player_controls.state != ControlledAction::None {
         let mut move_event = Move {
@@ -132,48 +150,8 @@ pub fn player_movement(
             acceleration: 1.0
         };
 
-        //TODO: move to animation
-        match player_controls.state.get_direction() {
-            Direction::Zero => {}
-            Direction::Up => {
-                animation_indices.first = 8;
-                animation_indices.last = 15;
-            }
-            Direction::Down => {
-                animation_indices.first = 8;
-                animation_indices.last = 15;
-            }
-            Direction::Right => {
-                animation_indices.first = 8;
-                animation_indices.last = 15;
-            }
-            Direction::Left => {
-                sprite.flip_x = true;
-                animation_indices.first = 8;
-                animation_indices.last = 15;
-            }
-            Direction::UpRight => {
-                animation_indices.first = 8;
-                animation_indices.last = 15;
-            }
-            Direction::UpLeft => {
-                sprite.flip_x = true;
-                animation_indices.first = 8;
-                animation_indices.last = 15;
-            }
-            Direction::DownRight => {
-                animation_indices.first = 8;
-                animation_indices.last = 15;
-            }
-            Direction::DownLeft => {
-                sprite.flip_x = true;
-                animation_indices.first = 8;
-                animation_indices.last = 15;
-            }
-        }
-
         info!("Sending move event: {:?}", &move_event);
-        event_writer.send(move_event);
+        move_event_writer.send(move_event);
     }
 }
 

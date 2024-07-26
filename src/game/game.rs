@@ -7,8 +7,10 @@ use bevy::prelude::{
 use crate::{
     AppState, WINDOW_HEIGHT, WINDOW_WIDTH
 };
+use crate::animation::animation::PepaAnimationPlugin;
 use crate::game::controls::controls::ControlsPlugin;
 use crate::game::movement::movement::MovementPlugin;
+use crate::game::npc::npc::NpcPlugin;
 use crate::game::player::player::PlayerPlugin;
 
 pub struct GamePlugin;
@@ -24,7 +26,7 @@ impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app
             .init_state::<GameState>()
-            .add_plugins((PlayerPlugin, MovementPlugin, ControlsPlugin))
+            .add_plugins((PlayerPlugin, MovementPlugin, ControlsPlugin, NpcPlugin))
             .add_systems(Startup, spawn_camera)
             .add_systems(Update, (toggle_pause,).run_if(in_state(AppState::Game)));
     }
@@ -50,7 +52,7 @@ pub fn toggle_pause(
 
 pub fn spawn_camera(mut commands: Commands) {
     commands.spawn(Camera2dBundle {
-        transform: Transform::from_xyz(WINDOW_WIDTH / 2.0, WINDOW_WIDTH / 2.0, 1.0),
+        transform: Transform::from_xyz(WINDOW_WIDTH / 2.0, WINDOW_HEIGHT / 2.0, 1.0),
         ..default()
     });
 }

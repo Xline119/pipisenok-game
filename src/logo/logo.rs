@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::animation::animation::{Animation, AnimationIndices, AnimationTimer, SheetProps};
-use crate::{AppState, WINDOW_WIDTH};
+use crate::{AppState, WINDOW_HEIGHT, WINDOW_WIDTH};
 
 const LOGO_WIDTH: f32 = 566.0;
 const LOGO_HEIGHT: f32 = 68.0;
@@ -33,23 +33,13 @@ impl Default for LogoTimer {
 pub fn show_logo(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
         SpriteBundle {
-            transform: Transform::from_xyz(WINDOW_WIDTH / 2.0, WINDOW_WIDTH / 2.0, 1.0),
+            transform: Transform::from_xyz(WINDOW_WIDTH / 2.0, WINDOW_HEIGHT / 2.0, 1.0),
             texture: asset_server.load("images/pipisenok-studios-logo.png"),
             ..default()
         },
         AudioBundle {
             source: asset_server.load("audio/pipisenok-logo.wav"),
             settings: PlaybackSettings::ONCE,
-        },
-        Animation {
-            sheet_props: SheetProps {
-                cell_size: UVec2::new((LOGO_WIDTH / 8.0) as u32, LOGO_HEIGHT as u32),
-                rows: 1,
-                cols: 8,
-            },
-            //animation_direction: AnimationDirection::Still,
-            animation_indices: AnimationIndices { first: 0, last: 7 },
-            animation_timer: AnimationTimer(Timer::from_seconds(0.625, TimerMode::Once)),
         },
         Logo {},
     ));

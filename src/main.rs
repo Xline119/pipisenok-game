@@ -3,6 +3,7 @@ use bevy::window::WindowResolution;
 
 use crate::game::game::GamePlugin;
 use crate::game::location::location::LocationPlugin;
+use crate::logo::logo::LogoPlugin;
 use crate::systems::*;
 use crate::ui::UiPlugin;
 
