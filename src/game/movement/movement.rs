@@ -83,6 +83,16 @@ impl Direction {
         Direction::DownLeft,
     ];
 
+    const NEG_X_AXES: [Self; 3] = [
+        Direction::Left,
+        Direction::UpLeft,
+        Direction::DownLeft
+    ];
+
+    pub fn is_neg_x_axes(&self) -> bool {
+        Self::NEG_X_AXES.contains(self)
+    }
+
     pub fn get_direction_vec(&self) -> Vec3 {
         match self {
             Direction::Up => Vec3::Y,

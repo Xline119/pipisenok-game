@@ -69,6 +69,17 @@ pub enum ControlledAction {
 }
 
 impl ControlledAction {
+    const MOVE_ACTIONS: [Self; 8] = [
+        ControlledAction::MoveUp,
+        ControlledAction::MoveDown,
+        ControlledAction::MoveLeft,
+        ControlledAction::MoveRight,
+        ControlledAction::MoveUpLeft,
+        ControlledAction::MoveDownRight,
+        ControlledAction::MoveDownLeft,
+        ControlledAction::MoveUpRight,
+    ];
+
     pub fn get_direction(&self) -> Direction {
         match self {
             ControlledAction::MoveUp => { Direction::Up }
@@ -106,6 +117,10 @@ impl ControlledAction {
             ControlledAction::Run => { true }
             _ => { false }
         }
+    }
+
+    pub fn is_move_action(&self) -> bool {
+        Self::MOVE_ACTIONS.contains(self)
     }
 }
 
