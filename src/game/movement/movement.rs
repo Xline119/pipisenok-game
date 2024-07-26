@@ -123,7 +123,7 @@ pub fn update_position(
             direction = direction.normalize()
         }
 
-        transform.translation += direction * move_event.speed * time.delta_seconds();
+        transform.translation += direction * move_event.speed * move_event.acceleration * time.delta_seconds();
         info!("New transform: {}", transform.translation)
     }
 }

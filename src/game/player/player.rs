@@ -3,12 +3,11 @@ use std::collections::HashSet;
 use std::vec;
 
 use bevy::audio::CpalSample;
-use bevy::prelude::{
-    App, AssetServer, ButtonInput, Camera, Commands, Component,
-    default, Entity, EventWriter, in_state, info, IntoSystemConfigs, KeyCode,
-    OnEnter, Plugin, Query, Res, ResMut, Resource,
-    Sprite, SpriteBundle, Timer, TimerMode, Transform, Update, UVec2, Vec3, With, Without
-};
+use bevy::prelude::{App, AssetServer, ButtonInput, Camera, Commands,
+                    Component, default, Entity, EventWriter, in_state, info,
+                    IntoSystemConfigs, KeyCode, OnEnter, Plugin, Query, Res, ResMut,
+                    Resource, Sprite, SpriteBundle, Time, Timer, TimerMode, Transform,
+                    Update, UVec2, Vec3, With, Without};
 use bevy::prelude::KeyCode::{
     ArrowDown, ArrowLeft, ArrowRight, ArrowUp, KeyA, KeyD, KeyS, KeyW, ShiftLeft, ShiftRight,
 };
@@ -51,6 +50,7 @@ impl Plugin for PlayerPlugin {
                 (
                     player_movement,
                     stick_camera_to_player,
+                    bound_player_movement,
                     //TODO: move animate to animation plugin
                     animate,
                 )
@@ -102,9 +102,17 @@ pub fn spawn_player(mut commands: Commands, asset_server: Res<AssetServer>) {
                 (ControlledAction::MoveUpLeft, vec![KeyW, KeyA, ArrowUp, ArrowLeft]),
                 (ControlledAction::MoveDownRight, vec![KeyS, KeyD, ArrowDown, ArrowRight]),
                 (ControlledAction::MoveDownLeft, vec![KeyS, KeyA, ArrowDown, ArrowLeft]),
+                (ControlledAction::Run(Direction::Up), vec![ShiftLeft, KeyW, ArrowUp]),
+                (ControlledAction::Run(Direction::Left), vec![ShiftLeft, KeyA, ArrowLeft]),
+                (ControlledAction::Run(Direction::Right), vec![ShiftLeft, KeyD, ArrowRight]),
+                (ControlledAction::Run(Direction::Down), vec![ShiftLeft, KeyS, ArrowDown]),
+                (ControlledAction::Run(Direction::UpLeft), vec![ShiftLeft, KeyW, KeyA, ArrowUp, ArrowLeft]),
+                (ControlledAction::Run(Direction::UpRight), vec![ShiftLeft, KeyW, KeyD, ArrowUp, ArrowRight]),
+                (ControlledAction::Run(Direction::DownLeft), vec![ShiftLeft, KeyS, KeyA, ArrowDown, ArrowLeft]),
+                (ControlledAction::Run(Direction::DownRight), vec![ShiftLeft, KeyS, KeyD, ArrowDown, ArrowRight]),
             ]),
             state: ControlledAction::None,
-            combined_state: None
+            direction: Direction::Zero
         }
     ));
 }
@@ -128,6 +136,17 @@ pub fn player_movement(
 
         info!("Sending animate event: {:?}", &animate_event);
         animate_event_writer.send(animate_event);
+    } else if player_controls.state.is_run_action() {
+        let mut animate_event = Animate {
+            entity: player_entity,
+            direction: player_controls.state.get_direction(),
+            animation_indices: AnimationIndices {
+                first: 0,
+                last: 7
+            }
+        };
+        info!("Sending animate event: {:?}", &animate_event);
+        animate_event_writer.send(animate_event);
     } else {
         let mut animate_event = Animate {
             entity: player_entity,
@@ -142,7 +161,7 @@ pub fn player_movement(
         animate_event_writer.send(animate_event);
     }
 
-    if player_controls.state != ControlledAction::None {
+    if player_controls.state.is_move_action() {
         let mut move_event = Move {
             entity: player_entity,
             direction: player_controls.state.get_direction(),
@@ -153,16 +172,33 @@ pub fn player_movement(
         info!("Sending move event: {:?}", &move_event);
         move_event_writer.send(move_event);
     }
+
+    if player_controls.state.is_run_action() || player_controls.state.is_diagonal_run_action() {
+        let mut move_event = Move {
+            entity: player_entity,
+            direction: player_controls.state.get_direction(),
+            speed: PLAYER_SPEED,
+            acceleration: 2.0
+        };
+
+        info!("Sending move event: {:?}", &move_event);
+        move_event_writer.send(move_event);
+    }
 }
 
 pub fn stick_camera_to_player(
     mut camera_query: Query<&mut Transform, With<Camera>>,
     player_query: Query<&Transform, (With<Player>, Without<Camera>)>,
+    time: Res<Time>
 ) {
     let mut camera_transform = camera_query.single_mut();
     let player_transform = player_query.single();
 
-    camera_transform.translation = player_transform.translation
+    camera_transform.translation = camera_transform.translation.lerp(player_transform.translation, 2.0 * time.delta_seconds());
+    camera_transform.translation = camera_transform.translation.clamp(
+        Vec3::new(f32::MIN, -WINDOW_HEIGHT, 0.0),
+        Vec3::new(f32::MAX, WINDOW_HEIGHT, 0.0),
+    )
 }
 
 pub fn despawn_player(mut commands: Commands, player_query: Query<Entity, With<Player>>) {
@@ -171,27 +207,11 @@ pub fn despawn_player(mut commands: Commands, player_query: Query<Entity, With<P
     }
 }
 
-pub fn bound_player_movement(mut player_query: Query<&mut Transform, With<Player>>) {
-    if let Ok(mut player_transform) = player_query.get_single_mut() {
-        let x_min = 0.0 + (PLAYER_WIDTH.to_float_sample() / 2.0);
-        let x_max = WINDOW_WIDTH - (PLAYER_WIDTH.to_float_sample() / 2.0);
-        let y_min = 0.0 + (PLAYER_HEIGHT.to_float_sample() / 2.0);
-        let y_max = WINDOW_HEIGHT - (PLAYER_HEIGHT.to_float_sample() / 2.0);
+pub fn bound_player_movement(mut query: Query<&mut Transform, With<Player>>) {
+    let mut transform = query.single_mut();
 
-        let mut translation = player_transform.translation;
-
-        if translation.x < x_min {
-            translation.x = x_min
-        } else if translation.x > x_max {
-            translation.x = x_max
-        }
-
-        if translation.y < y_min {
-            translation.y = y_min
-        } else if translation.y > y_max {
-            translation.y = y_max
-        }
-
-        player_transform.translation = translation;
-    }
+    transform.translation = transform.translation.clamp(
+        Vec3::new(f32::MIN, PLAYER_HEIGHT as f32 / 2.0, 0.0),
+        Vec3::new(f32::MAX, WINDOW_HEIGHT - (PLAYER_HEIGHT as f32 / 2.0), 0.0)
+    );
 }

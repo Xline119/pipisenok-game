@@ -43,14 +43,7 @@ impl Plugin for ControlsPlugin {
 pub struct Controls {
     pub controls_map: HashMap<ControlledAction, Vec<KeyCode>>,
     pub state: ControlledAction,
-    pub combined_state: Option<CombinedState>,
-}
-
-#[derive(Debug)]
-pub struct CombinedState {
-    //TODO handle state combination like Run + Run Direction or Attack + Attack direction etc.
-    state_1: ControlledAction,
-    state_2: ControlledAction,
+    pub direction: Direction
 }
 
 #[derive(Hash, Eq, Debug, Copy, Clone)]
@@ -63,7 +56,7 @@ pub enum ControlledAction {
     MoveDownRight,
     MoveDownLeft,
     MoveUpRight,
-    Run,
+    Run(Direction),
     Attack,
     None,
 }
@@ -90,15 +83,22 @@ impl ControlledAction {
             ControlledAction::MoveDownRight => { Direction::DownRight }
             ControlledAction::MoveDownLeft => { Direction::DownLeft }
             ControlledAction::MoveUpRight => { Direction::UpRight }
-            ControlledAction::Run => {
-                //TODO: Handle run
-                Direction::Zero
-            }
+            ControlledAction::Run(direction) => { *direction }
             ControlledAction::Attack => {
                 //TODO implement attack logic
                 Direction::Zero
             }
             ControlledAction::None => { Direction::Zero }
+        }
+    }
+
+    pub fn is_move(&self) -> bool {
+        match self {
+            ControlledAction::MoveUp => { true }
+            ControlledAction::MoveDown => { true }
+            ControlledAction::MoveLeft => { true }
+            ControlledAction::MoveRight => { true }
+            _ => false
         }
     }
 
@@ -114,7 +114,20 @@ impl ControlledAction {
 
     pub fn is_run_action(&self) -> bool {
         match self {
-            ControlledAction::Run => { true }
+            ControlledAction::Run(Direction::Up) => { true }
+            ControlledAction::Run(Direction::Left) => { true }
+            ControlledAction::Run(Direction::Down) => { true }
+            ControlledAction::Run(Direction::Right) => { true }
+            _ => { false }
+        }
+    }
+
+    pub fn is_diagonal_run_action(&self) -> bool {
+        match self {
+            ControlledAction::Run(Direction::UpLeft) => { true }
+            ControlledAction::Run(Direction::DownLeft) => { true }
+            ControlledAction::Run(Direction::UpRight) => { true }
+            ControlledAction::Run(Direction::DownRight) => { true }
             _ => { false }
         }
     }
@@ -144,7 +157,7 @@ pub fn handle_controls_state(
         let pressed_key = pressed_keys.iter().last().unwrap();
 
         for (action, mapped_keys) in &cloned_controls_map {
-            if !action.is_diagonal_move() && mapped_keys.contains(pressed_key) {
+            if action.is_move() && mapped_keys.contains(pressed_key) {
                 new_state = *action;
                 info!("New action state: {:?}", &new_state);
             }
@@ -157,6 +170,24 @@ pub fn handle_controls_state(
 
         for (action, mapped_keys) in &cloned_controls_map {
             if action.is_diagonal_move() && mapped_keys.contains(first_pressed) && mapped_keys.contains(second_pressed) {
+                new_state = *action;
+                info!("New action state: {:?}", &new_state);
+            }
+
+            if action.is_run_action() && mapped_keys.contains(first_pressed) && mapped_keys.contains(second_pressed) {
+                new_state = *action;
+                info!("New action state: {:?}", &new_state);
+            }
+        }
+    }
+
+    if pressed_keys.len() == 3 {
+        let first_pressed = pressed_keys.iter().next().unwrap();
+        let second_pressed = pressed_keys.iter().nth(1).unwrap();
+        let third_pressed = pressed_keys.iter().nth(2).unwrap();
+
+        for (action, mapped_keys) in &cloned_controls_map {
+            if action.is_diagonal_run_action() && mapped_keys.contains(first_pressed) && mapped_keys.contains(second_pressed) && mapped_keys.contains(third_pressed) {
                 new_state = *action;
                 info!("New action state: {:?}", &new_state);
             }
@@ -178,7 +209,7 @@ impl PartialEq for ControlledAction {
             (ControlledAction::MoveDownRight, ControlledAction::MoveDownRight) => true,
             (ControlledAction::MoveDownLeft, ControlledAction::MoveDownLeft) => true,
             (ControlledAction::MoveUpRight, ControlledAction::MoveUpRight) => true,
-            (ControlledAction::Run, ControlledAction::Run) => true,
+            (ControlledAction::Run(first_direction), ControlledAction::Run(second_direction)) => first_direction == second_direction,
             (ControlledAction::None, ControlledAction::None) => true,
             _ => false,
         }
