@@ -1,93 +1,127 @@
-use bevy::prelude::{App, Assets, Bundle, Commands, Component, Entity, Event, EventReader, info, Mut, Plugin, Query, Res, ResMut, Sprite, Startup, TextureAtlas, TextureAtlasLayout, Time, Timer, Update, UVec2};
+use crate::game::game::GameState;
 use crate::game::movement::movement::Direction;
+use crate::game::player::player::PlayerState;
+use bevy::log::info;
+use bevy::prelude::{
+    in_state, App, Component, Entity, Event, EventReader, Handle, Image, IntoSystemConfigs, Plugin,
+    Query, Res, Resource, TextureAtlas, TextureAtlasLayout, Time, Timer, Update,
+};
+use std::collections::HashMap;
 
 pub struct PepaAnimationPlugin;
 
 impl Plugin for PepaAnimationPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_event::<Animate>()
-            .add_systems(Startup, (setup_animations))
-            .add_systems(Update, (animate));
+        app.add_event::<AnimateEvent>()
+            .init_resource::<AnimationAssets>()
+            .add_systems(
+                Update,
+                (animate_v2, listen_for_texture_change).run_if(in_state(GameState::Running)),
+            );
     }
 }
 
-#[derive(Event, Debug)]
-pub struct Animate {
-    pub entity: Entity,
-    pub direction: Direction,
-    pub animation_indices: AnimationIndices,
+#[derive(Resource, Default, Debug)]
+pub struct AnimationAssets {
+    pub assets: HashMap<PlayerState, AnimationAsset>,
 }
 
-#[derive(Bundle)]
-pub struct Animation {
-    pub sheet_props: SheetProps,
-    pub animation_indices: AnimationIndices,
-    pub animation_timer: AnimationTimer,
+#[derive(Default, Debug)]
+pub struct AnimationAsset {
+    pub atlas_layout: Handle<TextureAtlasLayout>,
+    pub texture: Handle<Image>,
+    pub indices: HashMap<Direction, AnimationIndices>,
+    pub is_loaded: bool,
 }
 
-#[derive(Component)]
-pub struct SheetProps {
-    pub cell_size: UVec2,
-    pub rows: u32,
-    pub cols: u32,
-}
-
-#[derive(Component, Debug)]
+#[derive(Default, Debug)]
 pub struct AnimationIndices {
     pub first: usize,
     pub last: usize,
 }
 
+impl AnimationIndices {
+    pub fn new(first: usize, last: usize) -> Self {
+        Self { first, last }
+    }
+}
+
 #[derive(Component)]
-pub struct AnimationTimer(pub Timer);
+pub struct Animation {
+    pub timer: Timer,
+    pub direction: Direction,
+    pub state: PlayerState,
+}
 
-pub fn setup_animations(
-    mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
-    mut query: Query<(Entity, &SheetProps, &AnimationIndices)>,
-    mut commands: Commands,
-) {
-    for (entity, sheet_props, animation_indices) in query.iter() {
-        let layout = TextureAtlasLayout::from_grid(
-            sheet_props.cell_size,
-            sheet_props.cols,
-            sheet_props.rows,
-            None,
-            None,
-        );
+#[derive(Event, Debug, Default)]
+pub struct AnimateEvent {
+    pub new_state: PlayerState,
+    pub new_direction: Direction,
+}
 
-        commands.entity(entity).insert(TextureAtlas {
-            layout: texture_atlas_layouts.add(layout.clone()),
-            index: animation_indices.first,
-        });
+impl AnimateEvent {
+    pub fn new(new_state: PlayerState, new_direction: Direction) -> Self {
+        Self {
+            new_state,
+            new_direction,
+        }
     }
 }
 
-//TODO: Make Walk to Idle be more smooth
-pub fn animate(
+pub fn animate_v2(
+    mut query: Query<(&mut Animation, &mut TextureAtlas)>,
+    animation_assets: Res<AnimationAssets>,
     time: Res<Time>,
-    mut query: Query<(&mut AnimationTimer, &mut TextureAtlas, &mut Sprite)>,
-    mut event_reader: EventReader<Animate>
 ) {
-    for animate_event in event_reader.read() {
-        let (mut timer, mut atlas, mut sprite) = query.get_mut(animate_event.entity).unwrap();
-        sprite.flip_x = false;
-        timer.0.tick(time.delta());
+    let (mut animation, mut atlas) = query.single_mut();
+    let asset = animation_assets.assets.get(&animation.state).unwrap();
+    animation.timer.tick(time.delta());
 
-        if timer.0.finished() {
-            set_indexes(atlas, animate_event.animation_indices.last, animate_event.animation_indices.first);
-        }
+    if let Some(indices) = asset.indices.get(&animation.direction) {
+        if animation.timer.just_finished() {
+            info!("Timer ticked, atlas index: {:?}", atlas.index);
+            if atlas.index < indices.first {
+                atlas.index = indices.first;
+            }
 
-        if animate_event.direction.is_neg_x_axes() {
-            sprite.flip_x = true
+            if atlas.index < indices.last {
+                atlas.index += 1
+            } else {
+                atlas.index = indices.first
+            }
         }
     }
 }
 
-pub fn set_indexes(mut texture_atlas: Mut<TextureAtlas>, max: usize, start: usize) {
-    if texture_atlas.index < max {
-        texture_atlas.index += 1;
-    } else {
-        texture_atlas.index = start
+pub fn listen_for_texture_change(
+    mut texture_query: Query<(&mut Handle<Image>, &mut TextureAtlas)>,
+    mut animation_query: Query<&mut Animation>,
+    mut event_reader: EventReader<AnimateEvent>,
+    animation_assets: Res<AnimationAssets>,
+) {
+    for mut event in event_reader.read() {
+        info!("get event: {:?}", event);
+
+        let (mut texture, mut atlas) = texture_query.single_mut();
+        let mut animation = animation_query.single_mut();
+        let asset = animation_assets.assets.get(&event.new_state).unwrap();
+        let mut index = atlas.index;
+        let indices = asset.indices.get(&event.new_direction).unwrap();
+
+        if index < indices.first {
+            index = indices.first
+        }
+
+        if index > indices.last {
+            index = indices.last
+        }
+
+        animation.state = event.new_state;
+        animation.direction = event.new_direction;
+        *texture = asset.texture.clone();
+        *atlas = TextureAtlas {
+            layout: asset.atlas_layout.clone(),
+            index,
+        };
     }
 }

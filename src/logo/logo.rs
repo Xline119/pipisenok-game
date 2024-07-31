@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 
-use crate::animation::animation::{Animation, AnimationIndices, AnimationTimer, SheetProps};
 use crate::{AppState, WINDOW_HEIGHT, WINDOW_WIDTH};
 
 const LOGO_WIDTH: f32 = 566.0;
@@ -54,7 +53,7 @@ pub fn handle_logo_end(
 ) {
     logo_timer.0.tick(time.delta());
     if logo_timer.0.finished() {
-        next_state.set(AppState::MainMenu);
+        next_state.set(AppState::Loading);
         let entity = query.single();
 
         commands.entity(entity).despawn();

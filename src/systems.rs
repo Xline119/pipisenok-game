@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
-use crate::AppState;
 use crate::game::game::GameState;
+use crate::AppState;
 
 pub fn exit_on_escape(
     keyboard_input: Res<ButtonInput<KeyCode>>,

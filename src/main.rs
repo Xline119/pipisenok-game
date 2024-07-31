@@ -23,12 +23,7 @@ fn main() {
                 .set(get_window_settings())
                 .set(ImagePlugin::default_nearest()),
         )
-        .add_plugins((
-            UiPlugin,
-            GamePlugin,
-            LocationPlugin,
-            //LogoPlugin
-        ))
+        .add_plugins((UiPlugin, GamePlugin, LocationPlugin, LogoPlugin))
         .init_state::<AppState>()
         .add_systems(
             Update,
@@ -43,8 +38,8 @@ fn main() {
 
 #[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum AppState {
-    #[default]
     Logo,
+    #[default]
     Loading,
     MainMenu,
     Game,

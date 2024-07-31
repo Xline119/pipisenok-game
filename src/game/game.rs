@@ -1,17 +1,15 @@
 use bevy::prelude::{
-    App, AppExtStates, ButtonInput, Camera2dBundle, Commands, default,
-    in_state, info, IntoSystemConfigs, KeyCode, NextState,
-    Plugin, Res, ResMut, Startup, State, States, Transform, Update
+    default, in_state, info, App, AppExtStates, ButtonInput, Camera2dBundle, Commands,
+    IntoSystemConfigs, KeyCode, NextState, Plugin, Res, ResMut, Startup, State, States, Transform,
+    Update,
 };
 
-use crate::{
-    AppState, WINDOW_HEIGHT, WINDOW_WIDTH
-};
 use crate::animation::animation::PepaAnimationPlugin;
 use crate::game::controls::controls::ControlsPlugin;
 use crate::game::movement::movement::MovementPlugin;
 use crate::game::npc::npc::NpcPlugin;
 use crate::game::player::player::PlayerPlugin;
+use crate::{AppState, WINDOW_HEIGHT, WINDOW_WIDTH};
 
 pub struct GamePlugin;
 
@@ -24,9 +22,13 @@ pub enum GameState {
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
-        app
-            .init_state::<GameState>()
-            .add_plugins((PlayerPlugin, MovementPlugin, ControlsPlugin, NpcPlugin))
+        app.init_state::<GameState>()
+            .add_plugins((
+                PlayerPlugin,
+                MovementPlugin,
+                ControlsPlugin,
+                //NpcPlugin
+            ))
             .add_systems(Startup, spawn_camera)
             .add_systems(Update, (toggle_pause,).run_if(in_state(AppState::Game)));
     }
