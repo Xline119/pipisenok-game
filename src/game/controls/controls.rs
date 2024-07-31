@@ -2,23 +2,23 @@ use std::cmp::PartialEq;
 use std::collections::{HashMap, HashSet};
 use std::ops::Add;
 
-use bevy::prelude::{
-    in_state, info, App, ButtonInput, Component, Deref, IntoSystemConfigs, KeyCode, Plugin, Query,
-    Res, ResMut, Resource, Update,
-};
+use bevy::prelude::{in_state, info, App, ButtonInput, Component, Deref, IntoSystemConfigs, KeyCode, Plugin, Query, Res, ResMut, Resource, Update, Event, EventWriter, Entity};
 
 use crate::game::game::GameState;
-use crate::game::movement::movement::Direction;
+use crate::game::movement::movement::{Direction, MoveEndEvent};
 use crate::AppState;
 
 pub struct ControlsPlugin;
 
 impl Plugin for ControlsPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Actions>().add_systems(
-            Update,
-            handle_controls_state.run_if(in_state(GameState::Running)),
-        );
+        app
+            .init_resource::<Actions>()
+            .add_event::<ActionEvent>()
+            .add_systems(
+                Update,
+                handle_controls_state.run_if(in_state(GameState::Running)),
+            );
     }
 }
 
@@ -30,6 +30,33 @@ pub struct Controls {
 #[derive(Resource, Debug, Default, Deref)]
 pub struct Actions {
     pub current_actions: HashSet<ControlledAction>,
+}
+
+#[derive(Event, Debug)]
+pub struct ActionEvent {
+    pub actions: HashSet<ControlledAction>
+}
+
+impl ActionEvent {
+    pub fn new(actions: HashSet<ControlledAction>) -> Self {
+        Self {
+            actions
+        }
+    }
+
+    pub fn contains_running(&self) -> bool {
+        self.actions.contains(&ControlledAction::Run)
+    }
+
+    pub fn contains_move(&self) -> bool {
+        self.actions
+            .iter()
+            .any(|action| action.is_move_action())
+    }
+
+    pub fn is_attack(&self) -> bool {
+        self.actions.contains(&ControlledAction::Attack)
+    }
 }
 
 #[derive(Hash, Eq, Debug, Copy, Clone, Default)]
@@ -102,27 +129,38 @@ impl ControlledAction {
 
 pub fn handle_controls_state(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut actions: ResMut<Actions>,
-    mut query: Query<&mut Controls>,
+    mut event_writer: EventWriter<ActionEvent>,
+    mut move_end_event_writer: EventWriter<MoveEndEvent>,
+    mut query: Query<(Entity, &mut Controls)>,
 ) {
     let pressed_keys: HashSet<KeyCode> = keyboard_input.get_pressed().cloned().collect();
     let released_keys: HashSet<KeyCode> = keyboard_input.get_just_released().cloned().collect();
-    let mut controls = query.single_mut();
-    info!("Pressed keys: {:?}", pressed_keys);
 
-    for released_key in released_keys.iter() {
-        controls
-            .controls_map
-            .get(released_key)
-            .map(|it| actions.current_actions.remove(it));
+    let (entity, mut controls) = query.single_mut();
+    let mut new_actions = HashSet::new();
+
+    if !released_keys.is_empty() {
+        for released_key in released_keys.iter() {
+            controls
+                .controls_map
+                .get(released_key)
+                .map(|it| {
+                    if it.is_move_action() {
+                        move_end_event_writer.send(MoveEndEvent { entity });
+                    }
+                });
+        }
     }
 
-    for pressed_key in pressed_keys.iter() {
-        controls
-            .controls_map
-            .get(pressed_key)
-            .map(|it| actions.current_actions.insert(*it));
-    }
+    if !pressed_keys.is_empty() {
+        for pressed_key in pressed_keys.iter() {
+            controls
+                .controls_map
+                .get(pressed_key)
+                .map(|it| new_actions.insert(*it));
+        }
 
-    info!("Saved actions: {:?}", actions)
+        info!("Sending actions event: {:?}", &new_actions);
+        event_writer.send(ActionEvent::new(new_actions));
+    }
 }

@@ -13,7 +13,10 @@ pub struct MovementPlugin;
 
 impl Plugin for MovementPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<MoveEvent>().add_systems(
+        app
+            .add_event::<MoveEvent>()
+            .add_event::<MoveEndEvent>()
+            .add_systems(
             Update,
             (update_position)
                 .run_if(in_state(AppState::Game))
@@ -22,19 +25,17 @@ impl Plugin for MovementPlugin {
     }
 }
 
-#[derive(Component, Debug)]
-pub struct Movement {
-    pub velocity: f32,
-    pub acceleration: f32,
-    pub direction: Vec3,
-}
-
 #[derive(Event, Debug)]
 pub struct MoveEvent {
     pub entity: Entity,
     pub direction: Direction,
     pub acceleration: f32,
     pub speed: f32,
+}
+
+#[derive(Event, Debug)]
+pub struct MoveEndEvent {
+    pub entity: Entity,
 }
 
 impl MoveEvent {
@@ -93,30 +94,26 @@ impl Direction {
         Direction::DownLeft,
     ];
 
-    const NEG_X_AXES: [Self; 3] = [Direction::Left, Direction::UpLeft, Direction::DownLeft];
+    const NEG_X_AXES: [Self; 3] = [
+        Direction::Left,
+        Direction::UpLeft,
+        Direction::DownLeft
+    ];
 
     pub fn from_actions(actions: HashSet<ControlledAction>) -> Direction {
-        if actions.contains(&ControlledAction::MoveUp)
-            && actions.contains(&ControlledAction::MoveRight)
-        {
+        if actions.contains(&ControlledAction::MoveUp) && actions.contains(&ControlledAction::MoveRight) {
             return Direction::UpRight;
         }
 
-        if actions.contains(&ControlledAction::MoveDown)
-            && actions.contains(&ControlledAction::MoveLeft)
-        {
+        if actions.contains(&ControlledAction::MoveDown) && actions.contains(&ControlledAction::MoveLeft) {
             return Direction::DownLeft;
         }
 
-        if actions.contains(&ControlledAction::MoveDown)
-            && actions.contains(&ControlledAction::MoveRight)
-        {
+        if actions.contains(&ControlledAction::MoveDown) && actions.contains(&ControlledAction::MoveRight) {
             return Direction::DownRight;
         }
 
-        if actions.contains(&ControlledAction::MoveUp)
-            && actions.contains(&ControlledAction::MoveLeft)
-        {
+        if actions.contains(&ControlledAction::MoveUp) && actions.contains(&ControlledAction::MoveLeft) {
             return Direction::UpLeft;
         }
 
@@ -140,27 +137,19 @@ impl Direction {
     }
 
     pub fn vec_from_actions(actions: Vec<ControlledAction>) -> Vec3 {
-        if actions.contains(&ControlledAction::MoveUp)
-            && actions.contains(&ControlledAction::MoveRight)
-        {
+        if actions.contains(&ControlledAction::MoveUp) && actions.contains(&ControlledAction::MoveRight) {
             return Direction::Up.get_direction_vec() + Direction::Right.get_direction_vec();
         }
 
-        if actions.contains(&ControlledAction::MoveDown)
-            && actions.contains(&ControlledAction::MoveLeft)
-        {
+        if actions.contains(&ControlledAction::MoveDown) && actions.contains(&ControlledAction::MoveLeft) {
             return Direction::Down.get_direction_vec() + Direction::Left.get_direction_vec();
         }
 
-        if actions.contains(&ControlledAction::MoveDown)
-            && actions.contains(&ControlledAction::MoveRight)
-        {
+        if actions.contains(&ControlledAction::MoveDown) && actions.contains(&ControlledAction::MoveRight) {
             return Direction::Down.get_direction_vec() + Direction::Right.get_direction_vec();
         }
 
-        if actions.contains(&ControlledAction::MoveUp)
-            && actions.contains(&ControlledAction::MoveLeft)
-        {
+        if actions.contains(&ControlledAction::MoveUp) && actions.contains(&ControlledAction::MoveLeft) {
             return Direction::Up.get_direction_vec() + Direction::Left.get_direction_vec();
         }
 
@@ -217,8 +206,8 @@ pub fn update_position(
 ) {
     for mut move_event in event_reader.read() {
         let (mut transform) = transform_query.get_mut(move_event.entity).unwrap();
+        info!("Get event: {:?}", &move_event);
 
-        info!("Init transform: {}, of: {}",move_event.entity, transform.translation);
         let mut direction = move_event.direction.get_direction_vec();
 
         if direction.length() > 0.0 {
@@ -226,6 +215,5 @@ pub fn update_position(
         }
 
         transform.translation += direction * move_event.speed * move_event.acceleration * time.delta_seconds();
-        info!("New transform: {}", transform.translation)
     }
 }

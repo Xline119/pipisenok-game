@@ -7,6 +7,7 @@ use bevy::prelude::{
     Query, Res, Resource, TextureAtlas, TextureAtlasLayout, Time, Timer, Update,
 };
 use std::collections::HashMap;
+use std::time::Duration;
 
 pub struct PepaAnimationPlugin;
 
@@ -16,7 +17,7 @@ impl Plugin for PepaAnimationPlugin {
             .init_resource::<AnimationAssets>()
             .add_systems(
                 Update,
-                (animate_v2, listen_for_texture_change).run_if(in_state(GameState::Running)),
+                (animate, listen_for_texture_change).run_if(in_state(GameState::Running)),
             );
     }
 }
@@ -57,6 +58,7 @@ pub struct Animation {
 pub struct AnimateEvent {
     pub new_state: PlayerState,
     pub new_direction: Direction,
+    pub new_timer_duration: Option<Duration>
 }
 
 impl AnimateEvent {
@@ -64,11 +66,16 @@ impl AnimateEvent {
         Self {
             new_state,
             new_direction,
+            new_timer_duration: None
         }
+    }
+
+    pub fn new_timer(&mut self, new_timer_duration: Option<Duration>) {
+        self.new_timer_duration = new_timer_duration;
     }
 }
 
-pub fn animate_v2(
+pub fn animate(
     mut query: Query<(&mut Animation, &mut TextureAtlas)>,
     animation_assets: Res<AnimationAssets>,
     time: Res<Time>,
@@ -80,15 +87,12 @@ pub fn animate_v2(
     if let Some(indices) = asset.indices.get(&animation.direction) {
         if animation.timer.just_finished() {
             info!("Timer ticked, atlas index: {:?}", atlas.index);
-            if atlas.index < indices.first {
-                atlas.index = indices.first;
-            }
 
-            if atlas.index < indices.last {
-                atlas.index += 1
-            } else {
-                atlas.index = indices.first
-            }
+            atlas.index = match atlas.index {
+                idx if idx < indices.first => indices.first,
+                idx if idx < indices.last => idx + 1,
+                _ => indices.first
+            };
         }
     }
 }
@@ -105,16 +109,9 @@ pub fn listen_for_texture_change(
         let (mut texture, mut atlas) = texture_query.single_mut();
         let mut animation = animation_query.single_mut();
         let asset = animation_assets.assets.get(&event.new_state).unwrap();
-        let mut index = atlas.index;
         let indices = asset.indices.get(&event.new_direction).unwrap();
 
-        if index < indices.first {
-            index = indices.first
-        }
-
-        if index > indices.last {
-            index = indices.last
-        }
+        let index = atlas.index.clamp(indices.first, indices.last);
 
         animation.state = event.new_state;
         animation.direction = event.new_direction;

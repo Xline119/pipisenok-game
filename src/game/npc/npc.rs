@@ -9,7 +9,7 @@ use rand::random;
 
 use crate::animation::animation::AnimateEvent;
 use crate::game::game::GameState;
-use crate::game::movement::movement::{Direction, MoveEvent, Movement};
+use crate::game::movement::movement::{Direction, MoveEvent};
 use crate::{AppState, WINDOW_HEIGHT, WINDOW_WIDTH};
 
 const WARRIOR_WIDTH: u32 = 128;
@@ -54,11 +54,6 @@ impl Default for WarriorDirectionTimer {
 
 pub fn spawn_warriors(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
-        Movement {
-            velocity: 0.0,
-            acceleration: 0.0,
-            direction: Vec3::ZERO,
-        },
         SpriteBundle {
             transform: Transform::from_xyz(
                 WINDOW_WIDTH * random::<f32>(),
@@ -92,10 +87,7 @@ pub fn change_warrior_direction(
 
     if timer.0.finished() {
         warrior_direction.direction = Direction::Right;
-        info!(
-            "New warrior direction: {:?}",
-            warrior_direction.direction.get_direction_vec()
-        )
+        info!("New warrior direction: {:?}",warrior_direction.direction.get_direction_vec())
     }
 }
 
@@ -110,11 +102,6 @@ pub fn warrior_movement(
         warrior_direction.direction
     );
     for entity in query.iter() {
-        move_event_writer.send(MoveEvent::new(
-            &entity,
-            warrior_direction.direction,
-            50.0,
-            1.0,
-        ));
+        move_event_writer.send(MoveEvent::new(&entity, warrior_direction.direction, 50.0, 1.0));
     }
 }

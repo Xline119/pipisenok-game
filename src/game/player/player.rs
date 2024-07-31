@@ -1,31 +1,34 @@
-use crate::animation::animation::{
-    animate_v2, listen_for_texture_change, AnimateEvent, Animation, AnimationAsset,
-    AnimationAssets, AnimationIndices, PepaAnimationPlugin,
-};
-use crate::game::controls::controls::{Actions, ControlledAction, Controls};
-use crate::game::game::GameState;
-use crate::game::movement::movement::{Direction, MoveEvent, Movement};
-use crate::{AppState, WINDOW_HEIGHT, WINDOW_WIDTH};
+use std::cmp::PartialEq;
+use std::collections::{HashMap, HashSet};
+use std::time::Duration;
+use std::vec;
+
 use bevy::asset::ErasedAssetLoader;
 use bevy::audio::CpalSample;
-use bevy::prelude::KeyCode::{
-    ArrowDown, ArrowLeft, ArrowRight, ArrowUp, KeyA, KeyD, KeyF, KeyS, KeyW, ShiftLeft, ShiftRight,
-};
 use bevy::prelude::{
-    default, in_state, info, App, AssetEvent, AssetServer, Assets, ButtonInput, Camera, Commands,
-    Component, Entity, EventReader, EventWriter, Handle, Image, IntoSystemConfigs, KeyCode,
+    App, AssetEvent, Assets, AssetServer, ButtonInput, Camera, Commands, Component, default, Entity,
+    EventReader, EventWriter, Handle, Image, in_state, info, IntoSystemConfigs, KeyCode,
     NextState, OnEnter, OnExit, Plugin, Query, Res, ResMut, Resource, Sprite, SpriteBundle,
     TextureAtlas, TextureAtlasBuilder, TextureAtlasLayout, Time, Timer, TimerMode, Transform,
-    TransformBundle, UVec2, Update, Vec3, With, Without,
+    TransformBundle, Update, UVec2, Vec3, With, Without,
+};
+use bevy::prelude::KeyCode::{
+    ArrowDown, ArrowLeft, ArrowRight, ArrowUp, KeyA, KeyD, KeyF, KeyS, KeyW, ShiftLeft, ShiftRight,
 };
 use bevy_rapier2d::dynamics::GravityScale;
 use bevy_rapier2d::prelude::{
     Collider, ImpulseJoint, KinematicCharacterController, NoUserData, RapierDebugRenderPlugin,
     RapierPhysicsPlugin, RigidBody,
 };
-use std::cmp::PartialEq;
-use std::collections::{HashMap, HashSet};
-use std::vec;
+
+use crate::{AppState, WINDOW_HEIGHT, WINDOW_WIDTH};
+use crate::animation::animation::{
+    animate, AnimateEvent, Animation, AnimationAsset, AnimationAssets,
+    AnimationIndices, listen_for_texture_change, PepaAnimationPlugin,
+};
+use crate::game::controls::controls::{ActionEvent, Actions, ControlledAction, Controls};
+use crate::game::game::GameState;
+use crate::game::movement::movement::{Direction, MoveEndEvent, MoveEvent};
 
 const STARTING_TRANSLATION: Vec3 = Vec3::new(WINDOW_WIDTH / 2.0, WINDOW_HEIGHT / 2.0, 1.0);
 const PLAYER_SPEED: f32 = 200.0;
@@ -56,9 +59,9 @@ impl Plugin for PlayerPlugin {
                 (
                     player_movement,
                     stick_camera_to_player,
-                    //bound_player_movement,
+                    reset_player_state,
                     //TODO: move animate to animation plugin
-                    animate_v2,
+                    animate,
                     listen_for_texture_change,
                 )
                     .run_if(in_state(AppState::Game))
@@ -76,6 +79,7 @@ pub enum PlayerState {
     Idle,
     Walk,
     Run,
+    Attack
 }
 
 pub fn load_player_assets(
@@ -121,12 +125,29 @@ pub fn load_player_assets(
         ]),
         is_loaded: false,
     };
+    let attack_asset = AnimationAsset {
+        atlas_layout: layouts.add(create_atlas(4, 8)),
+        texture: asset_server.load("sprites/characters/raw_player/attack.png"),
+        indices: HashMap::from([
+            (Direction::Down, AnimationIndices::new(0, 3)),
+            (Direction::DownRight, AnimationIndices::new(4, 7)),
+            (Direction::Right, AnimationIndices::new(8, 11)),
+            (Direction::UpRight, AnimationIndices::new(12, 15)),
+            (Direction::Up, AnimationIndices::new(16, 19)),
+            (Direction::UpLeft, AnimationIndices::new(20, 23)),
+            (Direction::Left, AnimationIndices::new(24, 27)),
+            (Direction::DownLeft, AnimationIndices::new(28, 31)),
+            (Direction::Zero, AnimationIndices::new(0, 3)),
+        ]),
+        is_loaded: false,
+    };
 
     commands.insert_resource(AnimationAssets {
         assets: HashMap::from([
             (PlayerState::Idle, idle_asset),
             (PlayerState::Walk, walk_asset),
             (PlayerState::Run, run_asset),
+            (PlayerState::Attack, attack_asset),
         ]),
     })
 }
@@ -163,11 +184,6 @@ pub fn check_assets_loading(
 pub fn spawn_player(mut commands: Commands, player_animations: Res<AnimationAssets>) {
     info!("Spawning Player");
     commands.spawn((
-        Movement {
-            velocity: 0.0,
-            acceleration: 0.0,
-            direction: Vec3::ZERO,
-        },
         SpriteBundle {
             transform: Transform::from_translation(STARTING_TRANSLATION).with_scale(Vec3::new(5.0, 5.0, 1.0)),
             texture: player_animations.assets.get(&PlayerState::Idle).unwrap().texture.clone(),
@@ -179,8 +195,8 @@ pub fn spawn_player(mut commands: Commands, player_animations: Res<AnimationAsse
             direction: Direction::Zero,
         },
         TextureAtlas {
-            layout: player_animations.assets.get(&PlayerState::Walk).unwrap().atlas_layout.clone(),
-            index: player_animations.assets.get(&PlayerState::Walk).unwrap().indices.get(&Direction::Up).unwrap().first,
+            layout: player_animations.assets.get(&PlayerState::Idle).unwrap().atlas_layout.clone(),
+            index: player_animations.assets.get(&PlayerState::Idle).unwrap().indices.get(&Direction::Zero).unwrap().first,
         },
         Controls {
             //TODO: move to resources
@@ -198,8 +214,8 @@ pub fn spawn_player(mut commands: Commands, player_animations: Res<AnimationAsse
             ]),
         },
         Collider::cuboid(
-            (RAW_PLAYER_INITIAL_WIDTH / 2) as f32,
-            (RAW_PLAYER_INITIAL_HEIGHT / 2) as f32,
+            (RAW_PLAYER_INITIAL_WIDTH / 4) as f32,
+            (RAW_PLAYER_INITIAL_HEIGHT / 4) as f32,
         ),
         RigidBody::KinematicPositionBased,
         Player {},
@@ -208,33 +224,77 @@ pub fn spawn_player(mut commands: Commands, player_animations: Res<AnimationAsse
 
 pub fn player_movement(
     mut query: Query<Entity, With<Player>>,
-    actions: ResMut<Actions>,
+    mut event_reader: EventReader<ActionEvent>,
     mut move_event_writer: EventWriter<MoveEvent>,
     mut animate_event_writer: EventWriter<AnimateEvent>,
 ) {
-    let player_entity = query.single();
-    info!("Init actions in player move: {:?}", &actions);
+    let mut prev_event: Option<&ActionEvent> = None;
 
-    if actions.current_actions.is_empty() {
-        animate_event_writer.send(AnimateEvent::new(PlayerState::Idle, Direction::Zero));
-        return;
+    for event in event_reader.read() {
+        let player_entity = query.single();
+
+        info!("Get event: {:?}", event);
+        if event.contains_move() {
+            prev_event = Some(event);
+            let direction = Direction::from_actions(event.actions.clone());
+
+            if event.contains_running() {
+                send_events(
+                    create_events(&player_entity, direction, 2.0, PLAYER_SPEED, PlayerState::Walk),
+                    &mut move_event_writer,
+                    &mut animate_event_writer,
+                )
+            } else {
+                send_events(
+                    create_events(&player_entity, direction, 1.0, PLAYER_SPEED, PlayerState::Walk),
+                    &mut move_event_writer,
+                    &mut animate_event_writer,
+                )
+            }
+        }
+
+        if event.is_attack() {
+            let mut attack_event = AnimateEvent::new(PlayerState::Attack, Direction::from_actions(event.actions.clone()));
+            attack_event.new_timer(Some(Duration::from_millis(250)));
+            animate_event_writer.send(attack_event);
+        }
     }
+}
 
-    if actions.contains_move() {
-        if actions.contains_running() {
-            let direction = Direction::from_actions(actions.current_actions.clone());
-            let move_event = MoveEvent::new(&player_entity, direction, 2.0, PLAYER_SPEED);
+fn create_events(
+    entity: &Entity,
+    direction: Direction,
+    acceleration: f32,
+    speed: f32,
+    state: PlayerState
+) -> (MoveEvent, AnimateEvent) {
+    let move_event = MoveEvent::new(entity, direction, acceleration, speed);
+    let animate_event = AnimateEvent::new(state, direction);
 
-            info!("Sending Move event: {:?}", &move_event);
-            animate_event_writer.send(AnimateEvent::new(PlayerState::Run, direction));
-            move_event_writer.send(move_event);
-        } else {
-            let direction1 = Direction::from_actions(actions.current_actions.clone());
-            let move_event = MoveEvent::new(&player_entity, direction1, 1.0, PLAYER_SPEED);
+    return (move_event, animate_event)
+}
 
-            info!("Sending Move event: {:?}", &move_event);
-            animate_event_writer.send(AnimateEvent::new(PlayerState::Walk, direction1));
-            move_event_writer.send(move_event);
+fn send_events(
+    events: (MoveEvent, AnimateEvent),
+    mut move_event_writer: &mut EventWriter<MoveEvent>,
+    mut animate_event_writer: &mut EventWriter<AnimateEvent>,
+) {
+    info!("Sending Move event: {:?} and Animate event: {:?}", &events.0, &events.1);
+    move_event_writer.send(events.0);
+    animate_event_writer.send(events.1);
+}
+
+pub fn reset_player_state(
+    mut event_reader: EventReader<MoveEndEvent>,
+    mut animate_event_writer: EventWriter<AnimateEvent>,
+    query: Query<Entity, With<Player>>,
+) {
+    for event in event_reader.read() {
+        let entity = query.single();
+        info!("Get event: {:?} with entity: {:?}", &event, &entity);
+
+        if event.entity == entity {
+            animate_event_writer.send(AnimateEvent::new(PlayerState::Idle, Direction::Zero));
         }
     }
 }
@@ -250,27 +310,10 @@ pub fn stick_camera_to_player(
     camera_transform.translation = camera_transform
         .translation
         .lerp(player_transform.translation, 2.0 * time.delta_seconds());
-    // camera_transform.translation = camera_transform.translation.clamp(
-    //     Vec3::new(f32::MIN, -WINDOW_HEIGHT, 0.0),
-    //     Vec3::new(f32::MAX, WINDOW_HEIGHT, 0.0),
-    // )
 }
 
 pub fn despawn_player(mut commands: Commands, player_query: Query<Entity, With<Player>>) {
     if let Ok(player_entity) = player_query.get_single() {
         commands.entity(player_entity).despawn()
     }
-}
-
-pub fn bound_player_movement(mut query: Query<&mut Transform, With<Player>>) {
-    let mut transform = query.single_mut();
-
-    transform.translation = transform.translation.clamp(
-        Vec3::new(f32::MIN, RAW_PLAYER_INITIAL_HEIGHT as f32 / 2.0, 0.0),
-        Vec3::new(
-            f32::MAX,
-            WINDOW_HEIGHT - (RAW_PLAYER_INITIAL_HEIGHT as f32 / 2.0),
-            0.0,
-        ),
-    );
 }

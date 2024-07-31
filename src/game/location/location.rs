@@ -9,7 +9,8 @@ pub struct LocationPlugin;
 
 impl Plugin for LocationPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::Game), spawn_station)
+        app
+            .add_systems(OnEnter(AppState::Game), spawn_station)
             .add_systems(OnEnter(AppState::MainMenu), despawn_station_location);
     }
 }
@@ -28,6 +29,32 @@ pub fn spawn_station(mut commands: Commands, asset_server: Res<AssetServer>) {
         SpriteBundle {
             texture: asset_server.load("sprites/locations/station/station-new-start-001.png"),
             transform: Transform::from_xyz(WINDOW_WIDTH / 2.0, WINDOW_HEIGHT / 2.0, 0.0),
+            ..default()
+        },
+        StationLocation {
+            width: 1024.0,
+            height: 1024.0,
+        },
+    ));
+
+    let next_vec = Vec3::new(WINDOW_WIDTH / 2.0, WINDOW_HEIGHT / 2.0, 0.0) + Vec3::new(1024.0, 0.0, 0.0);
+    commands.spawn((
+        SpriteBundle {
+            texture: asset_server.load("sprites/locations/station/station-inner-001.png"),
+            transform: Transform::from_translation(next_vec),
+            ..default()
+        },
+        StationLocation {
+            width: 1024.0,
+            height: 1024.0,
+        },
+    ));
+
+    let next_vec = next_vec + Vec3::new(1024.0, 0.0, 0.0);
+    commands.spawn((
+        SpriteBundle {
+            texture: asset_server.load("sprites/locations/station/station-inner-001.png"),
+            transform: Transform::from_translation(next_vec),
             ..default()
         },
         StationLocation {
