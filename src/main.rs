@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy::window::WindowResolution;
+use bevy::window::{WindowMode, WindowResolution};
 
 use crate::game::game::GamePlugin;
 use crate::game::location::location::LocationPlugin;
@@ -13,8 +13,8 @@ pub mod logo;
 pub mod systems;
 pub mod ui;
 
-const WINDOW_WIDTH: f32 = 1280.0;
-const WINDOW_HEIGHT: f32 = 720.0;
+const WINDOW_WIDTH: f32 = 1920.0;
+const WINDOW_HEIGHT: f32 = 1080.0;
 
 fn main() {
     App::new()
@@ -52,6 +52,7 @@ fn get_window_settings() -> WindowPlugin {
             resolution: WindowResolution::new(WINDOW_WIDTH, WINDOW_HEIGHT),
             title: "Last of Pipisenok".to_string(),
             resizable: false,
+            mode: WindowMode::Fullscreen,
             ..Default::default()
         }),
         ..Default::default()

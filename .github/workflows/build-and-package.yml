@@ -1,0 +1,144 @@
+name: Build and Package for MacOS and Windows
+
+on:
+  workflow_dispatch:
+
+jobs:
+  increment-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v3
+
+      - name: Retrieve and increment version
+        id: version
+        run: |
+          version=$(grep '^version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          IFS='.' read -r -a parts <<< "$version"
+          parts[2]=$((parts[2]+1))
+          new_version="${parts[0]}.${parts[1]}.${parts[2]}"
+          sed -i "s/^version = \".*\"/version = \"$new_version\"/" Cargo.toml
+          echo "::set-output name=version::$new_version"
+
+      - name: Commit and push changes
+        env:
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          git config --global user.name "${GH_USERNAME}"
+          git config --global user.email "${GH_USERNAME}@users.noreply.github.com"
+          git checkout -b version-update-${{ steps.version.outputs.version }}
+          git add Cargo.toml
+          git commit -m "Increment version to ${{ steps.version.outputs.version }}"
+          git push https://${GH_USERNAME}:${GH_PAT}@github.com/${{ github.repository }}.git version-update-${{ steps.version.outputs.version }}
+
+      - name: Merge Branch
+        run: |
+          curl -X POST -H "Authorization: token ${{ secrets.GH_PAT }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/merges \
+            -d '{"base":"main","head":"version-update-${{ steps.version.outputs.version }}","commit_message":"Merge version update"}'
+
+      - name: Delete Branch
+        run: |
+          curl -X DELETE -H "Authorization: token ${{ secrets.GH_PAT }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/git/refs/heads/version-update-${{ steps.version.outputs.version }}
+
+  build-macos:
+    runs-on: macos-latest
+    needs: increment-version
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v3
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache Cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-index-
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Build the project
+        run: cargo build --release
+
+      - name: Prepare artifact
+        run: |
+          mkdir pipisenok-game-${{ needs.increment-version.outputs.version }}
+          cp target/release/pipisenok-game pipisenok-game-${{ needs.increment-version.outputs.version }}/pipisenok-game
+          cp -r assets pipisenok-game-${{ needs.increment-version.outputs.version }}/assets
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: pipisenok-game-macos-${{ needs.increment-version.outputs.version }}
+          path: pipisenok-game-${{ needs.increment-version.outputs.version }}
+
+  build-windows:
+    runs-on: macos-latest
+    needs: increment-version
+    env:
+      VERSION: ${{ needs.increment-version.outputs.version }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v3
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache Cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-index-
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install Windows target
+        run: rustup target add x86_64-pc-windows-gnu
+
+      - name: Install mingw-w64
+        run: brew install mingw-w64
+
+      - name: Build the project
+        run: cargo build --release --target x86_64-pc-windows-gnu
+
+      - name: Prepare artifact
+        run: |
+          mkdir pipisenok-game-${{ env.VERSION }}
+          cp target/x86_64-pc-windows-gnu/release/pipisenok-game.exe pipisenok-game-${{ env.VERSION }}/pipisenok-game.exe
+          cp -r assets pipisenok-game-${{ env.VERSION }}/assets
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: pipisenok-game-windows-${{ env.VERSION }}
+          path: pipisenok-game-${{ env.VERSION }}

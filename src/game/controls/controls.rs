@@ -15,6 +15,7 @@ impl Plugin for ControlsPlugin {
         app
             .init_resource::<Actions>()
             .add_event::<ActionEvent>()
+            .add_event::<ActionEndEvent>()
             .add_systems(
                 Update,
                 handle_controls_state.run_if(in_state(GameState::Running)),
@@ -35,6 +36,19 @@ pub struct Actions {
 #[derive(Event, Debug)]
 pub struct ActionEvent {
     pub actions: HashSet<ControlledAction>
+}
+
+#[derive(Event, Debug)]
+pub struct ActionEndEvent {
+    pub action: ControlledAction
+}
+
+impl ActionEndEvent {
+    pub fn new(action: ControlledAction) -> Self {
+        Self {
+            action
+        }
+    }
 }
 
 impl ActionEvent {
@@ -59,7 +73,7 @@ impl ActionEvent {
     }
 }
 
-#[derive(Hash, Eq, Debug, Copy, Clone, Default)]
+#[derive(Hash, Eq, Debug, Copy, Clone, Default, PartialEq)]
 pub enum ControlledAction {
     #[default]
     None,
@@ -80,21 +94,6 @@ impl Actions {
         self.current_actions
             .iter()
             .any(|action| action.is_move_action())
-    }
-}
-
-impl PartialEq for ControlledAction {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (ControlledAction::MoveUp, ControlledAction::MoveUp) => true,
-            (ControlledAction::MoveLeft, ControlledAction::MoveLeft) => true,
-            (ControlledAction::MoveDown, ControlledAction::MoveDown) => true,
-            (ControlledAction::MoveRight, ControlledAction::MoveRight) => true,
-            (ControlledAction::Run, ControlledAction::Run) => true,
-            (ControlledAction::Attack, ControlledAction::Attack) => true,
-            (ControlledAction::None, ControlledAction::None) => true,
-            _ => false,
-        }
     }
 }
 
@@ -130,34 +129,28 @@ impl ControlledAction {
 pub fn handle_controls_state(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut event_writer: EventWriter<ActionEvent>,
-    mut move_end_event_writer: EventWriter<MoveEndEvent>,
-    mut query: Query<(Entity, &mut Controls)>,
+    mut action_end_event_writer: EventWriter<ActionEndEvent>,
+    mut query: Query<&Controls>,
 ) {
     let pressed_keys: HashSet<KeyCode> = keyboard_input.get_pressed().cloned().collect();
     let released_keys: HashSet<KeyCode> = keyboard_input.get_just_released().cloned().collect();
 
-    let (entity, mut controls) = query.single_mut();
+    let controls = query.single_mut();
     let mut new_actions = HashSet::new();
 
     if !released_keys.is_empty() {
         for released_key in released_keys.iter() {
-            controls
-                .controls_map
-                .get(released_key)
-                .map(|it| {
-                    if it.is_move_action() {
-                        move_end_event_writer.send(MoveEndEvent { entity });
-                    }
-                });
+            if let Some(action) = controls.controls_map.get(released_key) {
+                action_end_event_writer.send(ActionEndEvent::new(*action));
+            }
         }
     }
 
     if !pressed_keys.is_empty() {
         for pressed_key in pressed_keys.iter() {
-            controls
-                .controls_map
-                .get(pressed_key)
-                .map(|it| new_actions.insert(*it));
+            if let Some(action) = controls.controls_map.get(pressed_key) {
+                new_actions.insert(*action);
+            }
         }
 
         info!("Sending actions event: {:?}", &new_actions);

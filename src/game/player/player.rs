@@ -22,11 +22,8 @@ use bevy_rapier2d::prelude::{
 };
 
 use crate::{AppState, WINDOW_HEIGHT, WINDOW_WIDTH};
-use crate::animation::animation::{
-    animate, AnimateEvent, Animation, AnimationAsset, AnimationAssets,
-    AnimationIndices, listen_for_texture_change, PepaAnimationPlugin,
-};
-use crate::game::controls::controls::{ActionEvent, Actions, ControlledAction, Controls};
+use crate::animation::animation::{animate, AnimateEvent, Animation, AnimationAsset, AnimationAssets, AnimationIndices, AnimationState, listen_for_texture_change, PepaAnimationPlugin};
+use crate::game::controls::controls::{ActionEndEvent, ActionEvent, Actions, ControlledAction, Controls};
 use crate::game::game::GameState;
 use crate::game::movement::movement::{Direction, MoveEndEvent, MoveEvent};
 
@@ -72,15 +69,6 @@ impl Plugin for PlayerPlugin {
 
 #[derive(Component)]
 pub struct Player;
-
-#[derive(Default, Eq, Hash, PartialEq, Copy, Clone, Debug)]
-pub enum PlayerState {
-    #[default]
-    Idle,
-    Walk,
-    Run,
-    Attack
-}
 
 pub fn load_player_assets(
     mut commands: Commands,
@@ -144,10 +132,10 @@ pub fn load_player_assets(
 
     commands.insert_resource(AnimationAssets {
         assets: HashMap::from([
-            (PlayerState::Idle, idle_asset),
-            (PlayerState::Walk, walk_asset),
-            (PlayerState::Run, run_asset),
-            (PlayerState::Attack, attack_asset),
+            (AnimationState::Idle, idle_asset),
+            (AnimationState::Walk, walk_asset),
+            (AnimationState::Run, run_asset),
+            (AnimationState::Attack, attack_asset),
         ]),
     })
 }
@@ -186,17 +174,18 @@ pub fn spawn_player(mut commands: Commands, player_animations: Res<AnimationAsse
     commands.spawn((
         SpriteBundle {
             transform: Transform::from_translation(STARTING_TRANSLATION).with_scale(Vec3::new(5.0, 5.0, 1.0)),
-            texture: player_animations.assets.get(&PlayerState::Idle).unwrap().texture.clone(),
+            texture: player_animations.assets.get(&AnimationState::Idle).unwrap().texture.clone(),
             ..default()
         },
         Animation {
             timer: Timer::from_seconds(0.125, TimerMode::Repeating),
-            state: PlayerState::Idle,
+            state: AnimationState::Idle,
             direction: Direction::Zero,
+            ..default()
         },
         TextureAtlas {
-            layout: player_animations.assets.get(&PlayerState::Idle).unwrap().atlas_layout.clone(),
-            index: player_animations.assets.get(&PlayerState::Idle).unwrap().indices.get(&Direction::Zero).unwrap().first,
+            layout: player_animations.assets.get(&AnimationState::Idle).unwrap().atlas_layout.clone(),
+            index: player_animations.assets.get(&AnimationState::Idle).unwrap().indices.get(&Direction::Zero).unwrap().first,
         },
         Controls {
             //TODO: move to resources
@@ -240,13 +229,13 @@ pub fn player_movement(
 
             if event.contains_running() {
                 send_events(
-                    create_events(&player_entity, direction, 2.0, PLAYER_SPEED, PlayerState::Walk),
+                    create_events(&player_entity, direction, 2.0, PLAYER_SPEED, AnimationState::Walk),
                     &mut move_event_writer,
                     &mut animate_event_writer,
                 )
             } else {
                 send_events(
-                    create_events(&player_entity, direction, 1.0, PLAYER_SPEED, PlayerState::Walk),
+                    create_events(&player_entity, direction, 1.0, PLAYER_SPEED, AnimationState::Walk),
                     &mut move_event_writer,
                     &mut animate_event_writer,
                 )
@@ -254,7 +243,7 @@ pub fn player_movement(
         }
 
         if event.is_attack() {
-            let mut attack_event = AnimateEvent::new(PlayerState::Attack, Direction::from_actions(event.actions.clone()));
+            let mut attack_event = AnimateEvent::new(AnimationState::Attack, Direction::from_actions(event.actions.clone()));
             attack_event.new_timer(Some(Duration::from_millis(250)));
             animate_event_writer.send(attack_event);
         }
@@ -266,7 +255,7 @@ fn create_events(
     direction: Direction,
     acceleration: f32,
     speed: f32,
-    state: PlayerState
+    state: AnimationState
 ) -> (MoveEvent, AnimateEvent) {
     let move_event = MoveEvent::new(entity, direction, acceleration, speed);
     let animate_event = AnimateEvent::new(state, direction);
@@ -285,17 +274,12 @@ fn send_events(
 }
 
 pub fn reset_player_state(
-    mut event_reader: EventReader<MoveEndEvent>,
+    mut event_reader: EventReader<ActionEndEvent>,
     mut animate_event_writer: EventWriter<AnimateEvent>,
-    query: Query<Entity, With<Player>>,
 ) {
     for event in event_reader.read() {
-        let entity = query.single();
-        info!("Get event: {:?} with entity: {:?}", &event, &entity);
-
-        if event.entity == entity {
-            animate_event_writer.send(AnimateEvent::new(PlayerState::Idle, Direction::Zero));
-        }
+        info!("Get event: {:?}", &event);
+        animate_event_writer.send(AnimateEvent::new(AnimationState::Idle, Direction::Zero));
     }
 }
 
