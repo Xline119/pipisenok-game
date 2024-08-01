@@ -8,6 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      project_name: ${{ steps.project_name.outputs.project_name }}
     steps:
       - name: Check out the repository
         uses: actions/checkout@v3
@@ -21,6 +22,12 @@ jobs:
           new_version="${parts[0]}.${parts[1]}.${parts[2]}"
           sed -i "s/^version = \".*\"/version = \"$new_version\"/" Cargo.toml
           echo "::set-output name=version::$new_version"
+
+      - name: Fetch project name
+        id: project_name
+        run: |
+          project_name=$(grep '^name =' Cargo.toml | sed 's/name = "\(.*\)"/\1/')
+          echo "::set-output name=project_name::$project_name"
 
       - name: Commit and push changes
         env:
@@ -50,6 +57,9 @@ jobs:
   build-macos:
     runs-on: macos-latest
     needs: increment-version
+    env:
+      VERSION: ${{ needs.increment-version.outputs.version }}
+      PROJECT_NAME: ${{ needs.increment-version.outputs.project_name }}
     steps:
       - name: Check out the repository
         uses: actions/checkout@v3
@@ -81,21 +91,22 @@ jobs:
 
       - name: Prepare artifact
         run: |
-          mkdir pipisenok-game-${{ needs.increment-version.outputs.version }}
-          cp target/release/pipisenok-game pipisenok-game-${{ needs.increment-version.outputs.version }}/pipisenok-game
-          cp -r assets pipisenok-game-${{ needs.increment-version.outputs.version }}/assets
+          mkdir -p ${{ env.PROJECT_NAME }}-${{ env.VERSION }}/${{ env.PROJECT_NAME }}
+          cp target/release/${{ env.PROJECT_NAME }} ${{ env.PROJECT_NAME }}-${{ env.VERSION }}/${{ env.PROJECT_NAME }}/${{ env.PROJECT_NAME }}
+          cp -r assets ${{ env.PROJECT_NAME }}-${{ env.VERSION }}/${{ env.PROJECT_NAME }}/assets
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: pipisenok-game-macos-${{ needs.increment-version.outputs.version }}
-          path: pipisenok-game-${{ needs.increment-version.outputs.version }}
+          name: ${{ env.PROJECT_NAME }}-macos-${{ env.VERSION }}
+          path: ${{ env.PROJECT_NAME }}-${{ env.VERSION }}
 
   build-windows:
     runs-on: macos-latest
     needs: increment-version
     env:
       VERSION: ${{ needs.increment-version.outputs.version }}
+      PROJECT_NAME: ${{ needs.increment-version.outputs.project_name }}
     steps:
       - name: Check out the repository
         uses: actions/checkout@v3
@@ -133,12 +144,12 @@ jobs:
 
       - name: Prepare artifact
         run: |
-          mkdir pipisenok-game-${{ env.VERSION }}
-          cp target/x86_64-pc-windows-gnu/release/pipisenok-game.exe pipisenok-game-${{ env.VERSION }}/pipisenok-game.exe
-          cp -r assets pipisenok-game-${{ env.VERSION }}/assets
+          mkdir -p ${{ env.PROJECT_NAME }}-${{ env.VERSION }}/${{ env.PROJECT_NAME }}
+          cp target/x86_64-pc-windows-gnu/release/${{ env.PROJECT_NAME }}.exe ${{ env.PROJECT_NAME }}-${{ env.VERSION }}/${{ env.PROJECT_NAME }}/${{ env.PROJECT_NAME }}.exe
+          cp -r assets ${{ env.PROJECT_NAME }}-${{ env.VERSION }}/${{ env.PROJECT_NAME }}/assets
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: pipisenok-game-windows-${{ env.VERSION }}
-          path: pipisenok-game-${{ env.VERSION }}
+          name: ${{ env.PROJECT_NAME }}-windows-${{ env.VERSION }}
+          path: ${{ env.PROJECT_NAME }}-${{ env.VERSION }}
