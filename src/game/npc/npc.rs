@@ -7,7 +7,6 @@ use bevy_rapier2d::geometry::Collider;
 use bevy_rapier2d::prelude::{GravityScale, KinematicCharacterController, RigidBody};
 use rand::random;
 
-use crate::animation::animation::AnimateEvent;
 use crate::game::game::GameState;
 use crate::game::movement::movement::{Direction, MoveEvent};
 use crate::{AppState, WINDOW_HEIGHT, WINDOW_WIDTH};
@@ -93,7 +92,6 @@ pub fn change_warrior_direction(
 
 pub fn warrior_movement(
     mut query: Query<Entity, With<Warrior>>,
-    mut animate_event_writer: EventWriter<AnimateEvent>,
     mut move_event_writer: EventWriter<MoveEvent>,
     warrior_direction: Res<WarriorDirection>,
 ) {

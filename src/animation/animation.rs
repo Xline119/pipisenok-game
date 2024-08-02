@@ -1,25 +1,27 @@
-use crate::game::game::GameState;
-use crate::game::movement::movement::Direction;
-use bevy::log::info;
-use bevy::prelude::{in_state, App, Component, Entity, Event, EventReader, Handle, Image, IntoSystemConfigs, Plugin, Query, Res, Resource, TextureAtlas, TextureAtlasLayout, Time, Timer, Update, With};
 use std::collections::HashMap;
 use std::time::Duration;
+
+use bevy::prelude::{App, Component, Entity, Event, EventReader, Handle, Image, in_state, info, IntoSystemConfigs, Plugin, Query, Res, Resource, TextureAtlas, TextureAtlasLayout, Time, Timer, TimerMode, Update};
+use bevy::utils::info;
+use crate::game::game::GameState;
+use crate::game::movement::movement::Direction;
 
 pub struct PepaAnimationPlugin;
 
 impl Plugin for PepaAnimationPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<AnimateEvent>()
-            .init_resource::<AnimationAssets>()
+        app
+            .add_event::<ClipChangeEvent>()
+            .init_resource::<AnimationLibrary>()
             .add_systems(
                 Update,
-                (animate, listen_for_texture_change).run_if(in_state(GameState::Running)),
+                (
+                    animate_clip,
+                    change_animation_clip
+                ).run_if(in_state(GameState::Running)),
             );
     }
 }
-
-#[derive(Component, Debug, Clone, Eq, PartialEq, Default)]
-pub struct Animator;
 
 #[derive(Default, Eq, Hash, PartialEq, Copy, Clone, Debug)]
 pub enum AnimationState {
@@ -32,40 +34,39 @@ pub enum AnimationState {
 
 #[derive(Component, Debug, Clone, Eq, PartialEq, Default)]
 pub struct AnimationClip {
-    pub state: AnimationState,
-    pub direction: Direction,
     pub indices: AnimationIndices,
     pub timer: Timer,
 }
 
-pub fn clip_animate(
-    time: Res<Time>,
-    mut query: Query<(&mut AnimationClip, &mut TextureAtlas), With<Animator>>,
-) {
-    for (mut animation_clip, mut atlas) in query.iter_mut() {
-        animation_clip.timer.tick(time.delta());
+impl AnimationClip {
+    pub fn new(indices: AnimationIndices, timer_mills: u64, timer_mode: TimerMode) -> Self {
+        Self {
+            indices,
+            timer: Timer::from_seconds(Duration::from_millis(timer_mills).as_secs_f32(), timer_mode),
+        }
+    }
 
-        if animation_clip.timer.just_finished() {
-            atlas.index = match atlas.index {
-                idx if idx < animation_clip.indices.first => animation_clip.indices.first,
-                idx if idx < animation_clip.indices.last => idx + 1,
-                _ => animation_clip.indices.first
-            };
+    pub fn new_with_timer(indices: AnimationIndices, timer: Timer) -> Self {
+        Self {
+            indices,
+            timer,
         }
     }
 }
 
-#[derive(Resource, Default, Debug)]
-pub struct AnimationAssets {
-    pub assets: HashMap<AnimationState, AnimationAsset>,
+#[derive(Debug, Default)]
+pub struct AnimationClipResource {
+    pub indices: AnimationIndices,
+    pub timer: Timer,
 }
 
-#[derive(Default, Debug)]
-pub struct AnimationAsset {
-    pub atlas_layout: Handle<TextureAtlasLayout>,
-    pub texture: Handle<Image>,
-    pub indices: HashMap<Direction, AnimationIndices>,
-    pub is_loaded: bool,
+impl AnimationClipResource {
+    pub fn new(indices: AnimationIndices, timer_mills: u64, timer_mode: TimerMode) -> Self {
+        Self {
+            indices,
+            timer: Timer::from_seconds(Duration::from_millis(timer_mills).as_secs_f32(), timer_mode),
+        }
+    }
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq, Hash)]
@@ -80,89 +81,84 @@ impl AnimationIndices {
     }
 }
 
-#[derive(Component, Default, Debug)]
-pub struct Animation {
-    pub timer: Timer,
-    pub direction: Direction,
-    pub state: AnimationState,
-    pub next_state: Option<AnimationState>,
-    pub next_direction: Option<Direction>,
-}
-
-#[derive(Event, Debug, Default)]
-pub struct AnimateEvent {
+#[derive(Event, Debug)]
+pub struct ClipChangeEvent {
+    pub entity: Entity,
     pub new_state: AnimationState,
     pub new_direction: Direction,
-    pub new_timer_duration: Option<Duration>
 }
 
-impl AnimateEvent {
-    pub fn new(new_state: AnimationState, new_direction: Direction) -> Self {
+impl ClipChangeEvent {
+    pub fn new(entity: &Entity, new_state: AnimationState, new_direction: Direction) -> Self {
         Self {
+            entity: *entity,
             new_state,
             new_direction,
-            new_timer_duration: None
         }
-    }
-
-    pub fn new_timer(&mut self, new_timer_duration: Option<Duration>) {
-        self.new_timer_duration = new_timer_duration;
     }
 }
 
-pub fn animate(
+#[derive(Resource, Default, Debug)]
+pub struct AnimationResource {
+    pub texture: Handle<Image>,
+    pub atlas_layout: Handle<TextureAtlasLayout>,
+}
+
+impl AnimationResource {
+    pub fn new(texture: Handle<Image>, atlas_layout: Handle<TextureAtlasLayout>) -> Self {
+        Self {
+            texture,
+            atlas_layout,
+        }
+    }
+}
+
+#[derive(Resource, Default, Debug)]
+pub struct AnimationLibrary {
+    pub clips: HashMap<(AnimationState, Direction), (AnimationClipResource, AnimationResource)>,
+}
+
+pub fn animate_clip(
     time: Res<Time>,
-    animation_assets: Res<AnimationAssets>,
-    mut query: Query<(&mut Animation, &mut TextureAtlas)>,
+    mut query: Query<(&mut AnimationClip, &mut TextureAtlas)>,
 ) {
-    let (mut animation, mut atlas) = query.single_mut();
-    let asset = animation_assets.assets.get(&animation.state).unwrap();
-    animation.timer.tick(time.delta());
+    for (mut animation_clip, mut atlas) in query.iter_mut() {
+        animation_clip.timer.tick(time.delta());
+        info!("Timer tick atlas index: {:?}", &atlas.index);
 
-    if let Some(indices) = asset.indices.get(&animation.direction) {
-        if animation.timer.just_finished() {
-            info!("Timer ticked, atlas index: {:?}", atlas.index);
-
+        if animation_clip.timer.just_finished() {
             atlas.index = match atlas.index {
-                idx if idx < indices.first => indices.first,
-                idx if idx < indices.last => idx + 1,
-                _ => indices.first
+                idx if idx < animation_clip.indices.first => animation_clip.indices.first,
+                idx if idx < animation_clip.indices.last => idx + 1,
+                _ => animation_clip.indices.first
             };
+        }
+    }
+}
 
-            // Check if there is a next state and direction to transition to
-            if let (Some(next_state), Some(next_direction)) = (animation.next_state.take(), animation.next_direction.take()) {
-                animation.state = next_state;
-                animation.direction = next_direction;
-                let next_asset = animation_assets.assets.get(&animation.state).unwrap();
-                let next_indices = next_asset.indices.get(&animation.direction).unwrap();
-                atlas.index = next_indices.first;
+pub fn change_animation_clip(
+    mut query: Query<(&mut AnimationClip, &mut TextureAtlas, &mut Handle<Image>)>,
+    mut event_reader: EventReader<ClipChangeEvent>,
+    animation_library: Res<AnimationLibrary>,
+) {
+    for event in event_reader.read() {
+        info!("Change animation clip event: {:?}", event);
+        if let Ok((mut animation_clip, mut texture_atlas, mut texture)) = query.get_mut(event.entity) {
+            if let Some((new_clip, resource)) = animation_library.clips.get(&(event.new_state, event.new_direction)) {
+                if animation_clip.timer.just_finished() {
+                    info!("Changing clip to: {:?} with resource: {:?}", &new_clip, &resource);
+
+                    animation_clip.indices = new_clip.indices.clone();
+                    animation_clip.timer = new_clip.timer.clone();
+                    *texture = resource.texture.clone();
+                    *texture_atlas = TextureAtlas {
+                        layout: resource.atlas_layout.clone(),
+                        index: texture_atlas.index,
+                    };
+                }
+            } else {
+                panic!("No clip found for state: {:?} and direction: {:?}", event.new_state, event.new_direction);
             }
         }
-    }
-}
-
-pub fn listen_for_texture_change(
-    mut texture_query: Query<(&mut Handle<Image>, &mut TextureAtlas)>,
-    mut animation_query: Query<&mut Animation>,
-    mut event_reader: EventReader<AnimateEvent>,
-    animation_assets: Res<AnimationAssets>,
-) {
-    for mut event in event_reader.read() {
-        info!("get event: {:?}", event);
-
-        let (mut texture, mut atlas) = texture_query.single_mut();
-        let mut animation = animation_query.single_mut();
-        let asset = animation_assets.assets.get(&event.new_state).unwrap();
-        let indices = asset.indices.get(&event.new_direction).unwrap();
-
-        let index = atlas.index.clamp(indices.first, indices.last);
-
-        animation.next_state = Some(event.new_state);
-        animation.next_direction = Some(event.new_direction);
-        *texture = asset.texture.clone();
-        *atlas = TextureAtlas {
-            layout: asset.atlas_layout.clone(),
-            index,
-        };
     }
 }

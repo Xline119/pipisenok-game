@@ -33,12 +33,12 @@ pub struct Actions {
     pub current_actions: HashSet<ControlledAction>,
 }
 
-#[derive(Event, Debug)]
+#[derive(Event, Debug, Eq, PartialEq)]
 pub struct ActionEvent {
     pub actions: HashSet<ControlledAction>
 }
 
-#[derive(Event, Debug)]
+#[derive(Event, Debug, Eq, PartialEq)]
 pub struct ActionEndEvent {
     pub action: ControlledAction
 }
@@ -68,8 +68,16 @@ impl ActionEvent {
             .any(|action| action.is_move_action())
     }
 
-    pub fn is_attack(&self) -> bool {
+    pub fn contains_attack(&self) -> bool {
         self.actions.contains(&ControlledAction::Attack)
+    }
+
+    pub fn is_attack(&self) -> bool {
+        self.actions.iter().all(|it| { it == &ControlledAction::Attack })
+    }
+
+    pub fn is_idle(&self) -> bool {
+        self.actions.iter().all(|it| { it == &ControlledAction::None })
     }
 }
 
@@ -129,7 +137,6 @@ impl ControlledAction {
 pub fn handle_controls_state(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut event_writer: EventWriter<ActionEvent>,
-    mut action_end_event_writer: EventWriter<ActionEndEvent>,
     mut query: Query<&Controls>,
 ) {
     let pressed_keys: HashSet<KeyCode> = keyboard_input.get_pressed().cloned().collect();
@@ -137,14 +144,6 @@ pub fn handle_controls_state(
 
     let controls = query.single_mut();
     let mut new_actions = HashSet::new();
-
-    if !released_keys.is_empty() {
-        for released_key in released_keys.iter() {
-            if let Some(action) = controls.controls_map.get(released_key) {
-                action_end_event_writer.send(ActionEndEvent::new(*action));
-            }
-        }
-    }
 
     if !pressed_keys.is_empty() {
         for pressed_key in pressed_keys.iter() {
@@ -155,5 +154,7 @@ pub fn handle_controls_state(
 
         info!("Sending actions event: {:?}", &new_actions);
         event_writer.send(ActionEvent::new(new_actions));
+    } else {
+        event_writer.send(ActionEvent::new(HashSet::from([ControlledAction::None])));
     }
 }
