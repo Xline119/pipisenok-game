@@ -143,22 +143,26 @@ pub fn change_animation_clip(
 ) {
     for event in event_reader.read() {
         info!("Change animation clip event: {:?}", event);
-        if let Ok((mut animation_clip, mut texture_atlas, mut texture)) = query.get_mut(event.entity) {
-            if let Some((new_clip, resource)) = animation_library.clips.get(&(event.new_state, event.new_direction)) {
-                if animation_clip.timer.just_finished() {
-                    info!("Changing clip to: {:?} with resource: {:?}", &new_clip, &resource);
+        let Ok((mut animation_clip, mut texture_atlas, mut texture)) = query.get_mut(event.entity) else {
+            continue;
+        };
 
-                    animation_clip.indices = new_clip.indices.clone();
-                    animation_clip.timer = new_clip.timer.clone();
-                    *texture = resource.texture.clone();
-                    *texture_atlas = TextureAtlas {
-                        layout: resource.atlas_layout.clone(),
-                        index: texture_atlas.index,
-                    };
-                }
-            } else {
-                panic!("No clip found for state: {:?} and direction: {:?}", event.new_state, event.new_direction);
-            }
+        let Some((new_clip, resource)) = animation_library.clips.get(&(event.new_state, event.new_direction)) else {
+            panic!("No clip found for state: {:?} and direction: {:?}", event.new_state, event.new_direction);
+        };
+
+        if !animation_clip.timer.just_finished() {
+            continue;
         }
+
+        info!("Changing clip to: {:?} with resource: {:?}", &new_clip, &resource);
+
+        animation_clip.indices = new_clip.indices.clone();
+        animation_clip.timer = new_clip.timer.clone();
+        *texture = resource.texture.clone();
+        *texture_atlas = TextureAtlas {
+            layout: resource.atlas_layout.clone(),
+            index: texture_atlas.index,
+        };
     }
 }
