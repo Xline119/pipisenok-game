@@ -1,155 +1,54 @@
-name: Build and Package for MacOS and Windows
+name: Build Pipisenok Game
 
+# Запускать workflow вручную (workflow_dispatch) или при коммитах в ветку main
 on:
   workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  increment-version:
+  build-linux:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      project_name: ${{ steps.project_name.outputs.project_name }}
     steps:
-      - name: Check out the repository
-        uses: actions/checkout@v3
+      # Получаем код
+      - uses: actions/checkout@v4
 
-      - name: Retrieve and increment version
-        id: version
+      # Установка системных зависимостей Bevy
+      - name: Install system dependencies
         run: |
-          version=$(grep '^version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
-          IFS='.' read -r -a parts <<< "$version"
-          parts[2]=$((parts[2]+1))
-          new_version="${parts[0]}.${parts[1]}.${parts[2]}"
-          sed -i "s/^version = \".*\"/version = \"$new_version\"/" Cargo.toml
-          echo "::set-output name=version::$new_version"
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
 
-      - name: Fetch project name
-        id: project_name
-        run: |
-          project_name=$(grep '^name =' Cargo.toml | sed 's/name = "\(.*\)"/\1/')
-          echo "::set-output name=project_name::$project_name"
-
-      - name: Commit and push changes
-        env:
-          GH_USERNAME: ${{ secrets.GH_USERNAME }}
-          GH_PAT: ${{ secrets.GH_PAT }}
-        run: |
-          git config --global user.name "${GH_USERNAME}"
-          git config --global user.email "${GH_USERNAME}@users.noreply.github.com"
-          git checkout -b version-update-${{ steps.version.outputs.version }}
-          git add Cargo.toml
-          git commit -m "Increment version to ${{ steps.version.outputs.version }}"
-          git push https://${GH_USERNAME}:${GH_PAT}@github.com/${{ github.repository }}.git version-update-${{ steps.version.outputs.version }}
-
-      - name: Merge Branch
-        run: |
-          curl -X POST -H "Authorization: token ${{ secrets.GH_PAT }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/merges \
-            -d '{"base":"main","head":"version-update-${{ steps.version.outputs.version }}","commit_message":"Merge version update"}'
-
-      - name: Delete Branch
-        run: |
-          curl -X DELETE -H "Authorization: token ${{ secrets.GH_PAT }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/git/refs/heads/version-update-${{ steps.version.outputs.version }}
-
-  build-macos:
-    runs-on: macos-latest
-    needs: increment-version
-    env:
-      VERSION: ${{ needs.increment-version.outputs.version }}
-      PROJECT_NAME: ${{ needs.increment-version.outputs.project_name }}
-    steps:
-      - name: Check out the repository
-        uses: actions/checkout@v3
-
-      - name: Cache Cargo registry
-        uses: actions/cache@v3
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-registry-
-
-      - name: Cache Cargo index
-        uses: actions/cache@v3
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-index-
-
+      # Настройка стабильного Rust‑toolchain
       - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           override: true
 
-      - name: Build the project
-        run: cargo build --release
-
-      - name: Prepare artifact
-        run: |
-          mkdir -p ${{ env.PROJECT_NAME }}-${{ env.VERSION }}/${{ env.PROJECT_NAME }}
-          cp target/release/${{ env.PROJECT_NAME }} ${{ env.PROJECT_NAME }}-${{ env.VERSION }}/${{ env.PROJECT_NAME }}/${{ env.PROJECT_NAME }}
-          cp -r assets ${{ env.PROJECT_NAME }}-${{ env.VERSION }}/${{ env.PROJECT_NAME }}/assets
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
+      # Кэш Cargo для ускорения повторных сборок
+      - name: Cache Cargo
+        uses: actions/cache@v4
         with:
-          name: ${{ env.PROJECT_NAME }}-macos-${{ env.VERSION }}
-          path: ${{ env.PROJECT_NAME }}-${{ env.VERSION }}
-
-  build-windows:
-    runs-on: macos-latest
-    needs: increment-version
-    env:
-      VERSION: ${{ needs.increment-version.outputs.version }}
-      PROJECT_NAME: ${{ needs.increment-version.outputs.project_name }}
-    steps:
-      - name: Check out the repository
-        uses: actions/checkout@v3
-
-      - name: Cache Cargo registry
-        uses: actions/cache@v3
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-registry-
+            ${{ runner.os }}-cargo-
 
-      - name: Cache Cargo index
-        uses: actions/cache@v3
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-index-
+      # Сборка релизной версии
+      - name: Build release
+        run: cargo build --release --locked
 
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-
-      - name: Install Windows target
-        run: rustup target add x86_64-pc-windows-gnu
-
-      - name: Install mingw-w64
-        run: brew install mingw-w64
-
-      - name: Build the project
-        run: cargo build --release --target x86_64-pc-windows-gnu
-
-      - name: Prepare artifact
-        run: |
-          mkdir -p ${{ env.PROJECT_NAME }}-${{ env.VERSION }}/${{ env.PROJECT_NAME }}
-          cp target/x86_64-pc-windows-gnu/release/${{ env.PROJECT_NAME }}.exe ${{ env.PROJECT_NAME }}-${{ env.VERSION }}/${{ env.PROJECT_NAME }}/${{ env.PROJECT_NAME }}.exe
-          cp -r assets ${{ env.PROJECT_NAME }}-${{ env.VERSION }}/${{ env.PROJECT_NAME }}/assets
-
+      # Загрузка бинарника и папки assets как артефакта
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.PROJECT_NAME }}-windows-${{ env.VERSION }}
-          path: ${{ env.PROJECT_NAME }}-${{ env.VERSION }}
+          name: pipisenok-game-linux
+          path: |
+            target/release/pipisenok-game
+            assets
