@@ -1,48 +1,28 @@
-name: One-off Linux build
+name: Build for Windows
 
 on:
-  workflow_dispatch:  # запуск вручную из вкладки Actions
+  workflow_dispatch:    # запуск вручную
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  build-linux:
-    runs-on: ubuntu-latest
+  build-windows:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
-      # Системные библиотеки для Bevy (звук/udev + pkg-config)
-      - name: Install system deps (Bevy)
+      - name: Ensure up-to-date Rust
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+          rustup update
+          rustup default stable
 
-      # Установка Rust toolchain (короткая официальная экшн от dtolnay)
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Build release
+        run: cargo build --release
 
-      # Кэш Cargo для ускорения (опционально, но полезно)
-      - name: Cache Cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
-
-      # Обновляем/создаём lock-файл без сборки (один раз в CI, без коммита)
-      - name: Generate lockfile
-        run: cargo generate-lockfile
-
-      # Теперь сборка с --locked пройдёт, т.к. lock актуален
-      - name: Build (release, locked)
-        run: cargo build --release --locked
-
-      # Отдаём бинарник и assets как артефакт для скачивания
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pipisenok-game-linux
-          path: |
-            target/release/pipisenok-game
-            assets
+          name: pipisenok-game-windows
+          path: target/release/pipisenok-game.exe
