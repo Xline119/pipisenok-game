@@ -1,28 +1,64 @@
-name: Build for Windows
+name: Build Pipisenok Game (Linux)
 
 on:
-  workflow_dispatch:    # запуск вручную
+  workflow_dispatch:    # ручной запуск
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  build-linux:
+    runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
 
-      - name: Ensure up-to-date Rust
+      # Пакеты для Bevy на Linux: звук/udev и pkg-config
+      - name: Install Bevy system deps
         run: |
-          rustup update
-          rustup default stable
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
 
-      - name: Build release
-        run: cargo build --release
+      # (опц.) Если включите фичу `wayland` у Bevy, добавьте ещё:
+      # sudo apt-get install -y libwayland-dev
 
+      # Короткая и надёжная установка Rust toolchain
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # Кэш Cargo (registry/git/target)
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      # Создаём/обновляем lock-файл в раннере, не трогая репозиторий
+      - name: Generate lockfile
+        run: cargo generate-lockfile
+
+      # Релизная сборка с фиксированным lock-файлом
+      - name: Build (release, locked)
+        run: cargo build --release --locked
+
+      # Мини smoke-тест: бинарник отвечает и не падает
+      - name: Smoke test
+        run: |
+          file target/release/pipisenok-game || true
+          ./target/release/pipisenok-game --help || true
+
+      # Отдаём бинарник и assets как артефакт
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pipisenok-game-windows
-          path: target/release/pipisenok-game.exe
+          name: pipisenok-game-linux
+          path: |
+            target/release/pipisenok-game
+            assets
+
